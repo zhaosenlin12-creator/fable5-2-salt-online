@@ -6,20 +6,26 @@
     ['bayhaven', 'expedition.maps.bayhaven', -8000, [-3200, 3200, -3520, 1279], [-24, 40.5], [-3.7, -5.5, 1.5], 0xff78a4, [-3.7, -8, 1.5]],
     ['dustfall', 'expedition.maps.dustfall', -16000, [-695, 695, -695, 695], [0, 0], [0, -5.5, 1.5], 0xffae52, [0, -8, 1.5]],
     ['mothlight', 'expedition.maps.mothlight', -20000, [-390, 390, -390, 390], [0, 38], [3.7, -5.5, 1.5], 0x56e5ff, [3.7, -8, 1.5]],
-    ['lunar', 'expedition.maps.lunar', -24000, [-99, 99, -99, 99], [0, 41], [7.4, -5.5, 1.5], 0xc1caff, [7.4, -8, 1.5]]
+    ['lunar', 'expedition.maps.lunar', -24000, [-99, 99, -99, 99], [0, 41], [7.4, -5.5, 1.5], 0xc1caff, [7.4, -8, 1.5]],
+    // 新增两张生态扩展图：度假岛·船厂与山谷·伐木场。
+    ['resort', 'expedition.maps.resort', -28000, [-88, 88, -88, 88], [10, -52], [-6.9, -5.5, 1.5], 0x2ec4b6, [-6.9, -7.5, 1.5], 1.6],
+    ['lumbermill', 'expedition.maps.lumbermill', -32000, [-150, 150, -150, 150], [-54, 6], [-10.1, -5.5, 1.5], 0x8ac24a, [-10.1, -7.5, 1.5], 4]
   ];
   // Offsets from each arrival point. Keep the central path and return rift clear.
   const respawnOffsets = [[-8, 0], [8, 0], [-8, 4], [8, 4], [-8, 8], [8, 8], [0, -6], [0, 10]];
-  const maps = Object.fromEntries(definitions.map(([id, titleKey, offset, edges, start, entrance, color, hub]) => {
+  // Arrival heading per map. Default faces the return rift; the two new maps
+  // turn the player towards their signature scenery instead.
+  const arrivalYaw = { resort: 0, lumbermill: 0 };
+  const maps = Object.fromEntries(definitions.map(([id, titleKey, offset, edges, start, entrance, color, hub, landingY]) => {
     const [minX, maxX, minZ, maxZ] = edges;
-    const landing = { x: start[0], z: start[1] + offset, y: id === 'dustfall' ? 16 : 0 };
+    const landing = { x: start[0], z: start[1] + offset, y: landingY ?? (id === 'dustfall' ? 16 : 0) };
     const respawns = respawnOffsets.map(([x, z]) => ({
       x: landing.x + x,
       z: landing.z + z,
       y: id === 'bayhaven' ? (z === 4 || z === 8 ? .14 : z === 10 ? .02 : 0) : landing.y
     }));
     return [id, {
-      id, titleKey, offset, color,
+      id, titleKey, offset, color, arrivalYaw: arrivalYaw[id],
       ...(id === 'lunar' ? { gravity: 1.62, jumpSpeed: 3.4 } : {}), minX, maxX, minZ: minZ + offset, maxZ: maxZ + offset,
       gate: { x: entrance[0], z: qingyun.offsetZ + entrance[1], y: entrance[2] },
       landing, respawns,

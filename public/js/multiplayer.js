@@ -4148,7 +4148,8 @@
     return {
       type: 'join', name: myName, soldier: mySoldier, outfit: myOutfit, spawns: spawnsFromLevel(),
       frontier: !!window.SaltFrontierRules, portalFall: !!window.SaltPortalArrival,
-      infiniteAmmo: window.SaltAmmo?.infinite === true
+      infiniteAmmo: window.SaltAmmo?.infinite === true,
+      godMode: window.SaltGodMode?.enabled === true
     };
   }
   function sendJoin() {
@@ -4458,8 +4459,15 @@
       case 'patrolDestroyed':
         G?.sharedPatrols?.destroyed(msg);
         break;
+      case 'squadShot':
+        G?.squad?.shot(msg);
+        break;
+      case 'squadNotice':
+        G?.squad?.notice(msg);
+        break;
       case 'snapshot': {
         G?.expedition?.setServerTime(msg.t);
+        if (msg.mods) window.__saltMods = msg.mods;
         const count = Number(msg.online);
         onlineCount = Number.isSafeInteger(count) && count >= 0 ? count : null;
         const others = Number(msg.onlineOthers);
@@ -4469,6 +4477,7 @@
         window.SaltMapSelect?.setPopulation(msg.mapCounts);
         G?.portalBosses?.snapshot(msg.bossMap, msg.bosses, msg.t, msg.bossBounty);
         G?.sharedPatrols?.snapshot(msg.bossMap,msg.patrols);
+        G?.squad?.snapshot(msg.bossMap, msg.squads);
         if (msg.you) {
           const previousAlive = selfStats.alive;
           selfStats = {
@@ -4680,6 +4689,7 @@
   function attachGame(game) {
     G = game;
     G.sharedPatrols ||= window.installSharedPatrols?.(G);
+    G.squad ||= window.installSquad?.(G);
     window.SaltCorpseField?.attach(G);
     if (game.frontier) {
       for (const message of pendingFrontier.values()) game.frontier.onMessage(message);
@@ -4761,6 +4771,7 @@
       const dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0.016;
       lastFrame = now;
       try { updateAvatars(dt); G?.sharedPatrols?.update(dt,connected); } catch (err) { /* ignore */ }
+      try { G?.squad?.update(dt); } catch (err) { /* ignore */ }
       try { G?.portalBosses?.update(dt, now, connected, normalizeSoldier(mySoldier) === 'drone'); } catch (err) { /* keep drawing other players */ }
       window.SaltBulletMarks?.tick(G);
       window.SaltCorpseField?.tick(G);

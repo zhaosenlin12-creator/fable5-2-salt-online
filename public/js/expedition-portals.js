@@ -325,7 +325,7 @@
       const exitClearance = zone.id === 'dustfall' ? .06 : 1.45;
       exitGate.position.set(zone.exit.x, exitY + exitClearance, zone.exit.z);
       const point = { ...position, y: ground(position.x, position.z, zone.landing.y + 2) };
-      land(point, Math.PI);
+      land(point, zone.arrivalYaw ?? Math.PI);
       hold(null);
       if (zone.id === 'dustfall') game.frontier?.begin(world, point, false);
       if (insert) game.portalArrival?.start();

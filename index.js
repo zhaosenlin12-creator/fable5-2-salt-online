@@ -25,7 +25,7 @@ const PORT = process.env.PORT || 3000;
 // 托管平台的反向代理通常不在应用所在容器的回环命名空间内。
 // 默认监听所有网卡；预览网关会显式注入 HOST=127.0.0.1，仍按平台值启动。
 const HOST = process.env.HOST || '0.0.0.0';
-const ASSET_VERSION = '20261123-playgate-dismiss-v' + RELEASE_VERSION;
+const ASSET_VERSION = '20261123-salt-squad-maps-v' + RELEASE_VERSION;
 
 app.set('view engine', 'ejs');
 app.engine('html', ejs.renderFile);

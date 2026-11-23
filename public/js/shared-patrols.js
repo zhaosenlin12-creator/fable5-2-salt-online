@@ -407,7 +407,7 @@
         const x = position.x - origin.x, y = position.y + (row.kind === 'hound' ? .65 : 0) - origin.y, z = position.z - origin.z;
         const along = x * dir.x + y * dir.y + z * dir.z;
         const side = x * x + y * y + z * z - along * along;
-        const radius = row.kind === 'hound' ? .92 : .78;
+        const radius = row.kind === 'hound' ? .92 : row.kind === 'drone' ? .66 : .78;
         if (along < 0 || side >= radius * radius) continue;
         const hit = Math.max(0, along - Math.sqrt(radius * radius - side));
         if (hit < (nearest ?? range)) nearest = hit;

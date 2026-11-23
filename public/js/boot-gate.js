@@ -57,6 +57,7 @@
     'death-replay-3d.js',
     'bullet-marks.js',
     'corpse-field.js',
+    'squad.js',
     'multiplayer.js',
     'hound-flip-tuning.js',
     'kill-streak.js',

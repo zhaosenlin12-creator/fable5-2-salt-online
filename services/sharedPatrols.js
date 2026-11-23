@@ -5,7 +5,9 @@ const { maps } = require('../public/js/expedition-zones');
 const qingyun = require('../public/js/qingyun-zone');
 const { ground, blocked, houndPathClear } = require('./portalBosses');
 
-const kinds={hound:{hp:140,speed:2.6,radius:.92,air:0,damage:7},gull:{hp:45,speed:4,radius:.78,air:5,damage:5}};
+const kinds={hound:{hp:140,speed:2.6,radius:.92,air:0,damage:7},gull:{hp:45,speed:4,radius:.78,air:5,damage:5},drone:{hp:96,speed:5.4,radius:.66,air:4.2,damage:6}};
+// 新增地图额外投放空中无人机，与机器狗组成该图的守军。
+const mapKinds=map=>map==='resort'||map==='lumbermill'?['hound','gull','drone']:['hound','gull'];
 const anchors={qingyun:{x:0,y:2,z:qingyun.offsetZ+9},...Object.fromEntries(Object.values(maps).map(map=>[map.id,map.landing]))};
 const offsets=[[-15,-13],[15,-13],[-21,-7],[21,-7],[-15,14],[15,14]];
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
@@ -19,7 +21,7 @@ function rayHit(origin,dir,point,radius,range){
   return hit<range?hit:null;
 }
 function createSharedPatrols({players,mapKey,fire,damage,destroy,eligible}){
-  const zones=new Map(Object.entries(anchors).map(([map,anchor])=>[map,['hound','gull'].map((kind,i)=>({kind,anchor,i,due:0,round:0,unit:null}))]));
+  const zones=new Map(Object.entries(anchors).map(([map,anchor])=>[map,mapKinds(map).map((kind,i)=>({kind,anchor,i,due:0,round:0,unit:null}))]));
   let lastTick;
   const current=new Map();
   function point(map,x,z,slot){
@@ -105,11 +107,25 @@ function createSharedPatrols({players,mapKey,fire,damage,destroy,eligible}){
     }
     return true;
   }
+  function damageUnit(map,id,amount,now,shooter){
+    for(const slot of zones.get(map)||[]){
+      const unit=slot.unit;
+      if(!unit||unit.id!==id)continue;
+      unit.hp=Math.max(0,unit.hp-amount);
+      if(unit.hp===0){
+        slot.unit=null;
+        slot.due=now+(unit.map==='qingyun'?25000:12000);
+        destroy(shooter||null,unit,ground(unit.map,unit.x,unit.z,slot.anchor.y),now);
+      }
+      return true;
+    }
+    return false;
+  }
   function snapshot(map){
     return (zones.get(map)||[]).flatMap(({unit})=>unit?[{
       id:unit.id,kind:unit.kind,x:unit.x,y:unit.y,z:unit.z,yaw:unit.yaw,moving:unit.moving,hp:unit.hp
     }]:[]);
   }
-  return {tick,intersect,shoot,snapshot};
+  return {tick,intersect,shoot,snapshot,damageUnit};
 }
 module.exports={createSharedPatrols};

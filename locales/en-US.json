@@ -971,7 +971,9 @@
       "bayhaven": "Bayhaven",
       "dustfall": "Dustfall",
       "mothlight": "Mothlight",
-      "lunar": "Lunar Outpost"
+      "lunar": "Lunar Outpost",
+      "resort": "Resort Island Shipyard",
+      "lumbermill": "Valley Lumber Mill"
     },
     "guideTitle": "Portal bearings",
     "distance": "{n} m",
@@ -1283,5 +1285,25 @@
     "dismissed": "Home screen opened. Deploy is unavailable during work hours.",
     "reopened": "Work hours are active, so Deploy is unavailable right now.",
     "dismissHint": "Close this to browse the home screen. During work hours, Deploy will show this schedule again."
+  },
+  "squad": {
+    "toggle": "AI Squad Mates",
+    "on": "On",
+    "off": "Off",
+    "assault": "Assault",
+    "sniper": "Sniper",
+    "medic": "Medic",
+    "downed": "Down",
+    "reviving": "Reviving…",
+    "medicReviving": "Medic is reviving",
+    "revivePrompt": "Press E to revive {name}",
+    "memberDown": "{name} is down and needs a revive",
+    "memberRevived": "{name} is back on their feet"
+  },
+  "godMode": {
+    "toggle": "Invincible",
+    "hint": "Take no damage (private servers only)",
+    "on": "On",
+    "off": "Off"
   }
 }

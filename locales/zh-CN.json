@@ -709,7 +709,9 @@
       "bayhaven": "湾城",
       "dustfall": "西部荒原",
       "mothlight": "霓虹雨城",
-      "lunar": "月球战区"
+      "lunar": "月球战区",
+      "resort": "度假岛·船厂",
+      "lumbermill": "山谷·伐木场"
     },
     "guideTitle": "传送门方位",
     "distance": "{n} 米",
@@ -1021,5 +1023,25 @@
     "dismissed": "已进入主页；工作时间段内暂时无法开始行动。",
     "reopened": "当前为工作时间段，暂时无法开始行动。",
     "dismissHint": "关闭后可以先浏览主页；工作时间段内点击「开始行动」会再次弹出开放时段提示。"
+  },
+  "squad": {
+    "toggle": "小队 AI 队友",
+    "on": "开",
+    "off": "关",
+    "assault": "突击",
+    "sniper": "狙击",
+    "medic": "医疗",
+    "downed": "倒地",
+    "reviving": "扶起中…",
+    "medicReviving": "医疗兵正在扶起",
+    "revivePrompt": "按 E 扶起 {name}",
+    "memberDown": "{name} 已倒地，需要队友扶起",
+    "memberRevived": "{name} 已归队"
+  },
+  "godMode": {
+    "toggle": "无敌",
+    "hint": "开启后免疫一切伤害（仅私有服）",
+    "on": "开",
+    "off": "关"
   }
 }

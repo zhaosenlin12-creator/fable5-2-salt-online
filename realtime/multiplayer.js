@@ -12,6 +12,7 @@ const deathReplay = require('../services/deathReplay');
 const { createShop } = require('../services/shop');
 const playerAuthority = require('../services/playerAuthority');
 const { createPortalBosses, landingSurface } = require('../services/portalBosses');
+const { createSquad } = require('../services/squad');
 const { BOSS_NAMES } = require('../public/js/portal-boss-rules');
 const { isInsideAirWall, PORT_PLAYER_START, PORT_SPAWN_YAW } = require('../public/js/flight-collision');
 const { randomUUID } = require('node:crypto');
@@ -48,6 +49,9 @@ const PROTECT_MS = 2000;
 const BOSS_SPAWN_GRACE_MS = 9000;
 const RECENT_DAMAGE_MS = 8000;
 const MAX_HP = 100;
+// 中文魔改：只有显式设置 SALT_MOD=1 的私有服才允许「无敌」，公网默认关闭。
+const MODS_ENABLED = ['1', 'true', 'on', 'yes'].includes(String(process.env.SALT_MOD || '').toLowerCase());
+const godMode = player => MODS_ENABLED && player?.godMode === true;
 const arsenal = require('../public/js/arsenal-rules');
 const MAX_NAME = 16;
 const WORLD_LIMIT = 900;
@@ -1012,6 +1016,7 @@ function killPlayer(victim, killer, now, cause = null) {
 }
 
 function applyPlayerDamage(target, attacker, amount, armor, now) {
+  if (godMode(target)) return;
   const damage = frontier.armor(target, amount, armor, now);
   target.hp = Math.max(0, target.hp - damage);
   const killed = target.hp <= 0;
@@ -1047,6 +1052,7 @@ const portalBosses = createPortalBosses({
       player => player.joined && mapKeyOf(player) === boss.map);
   },
   damage(target, boss, amount, now, origin = boss) {
+    if (godMode(target)) return;
     const damage = frontier.armor(target, amount, 'vest', now);
     target.hp = Math.max(0, target.hp - damage);
     const cause = {
@@ -1056,6 +1062,7 @@ const portalBosses = createPortalBosses({
     send(target.ws, { type: 'damaged', amount: damage, hp: target.hp, bossDamage: true, from: {
       ...cause, pos: { x: origin.x, y: origin.y, z: origin.z }
     } });
+    squad.hurt(target, damage, now, origin);
     if (target.hp <= 0) killPlayer(target, null, now, cause);
   }
 });
@@ -1069,10 +1076,12 @@ const sharedPatrols = require('../services/sharedPatrols').createSharedPatrols({
       player => player.joined && mapKeyOf(player) === unit.map);
   },
   damage(target, unit, amount, now, origin) {
+    if (godMode(target)) return;
     const damage = frontier.armor(target,amount,'vest',now);
     target.hp = Math.max(0,target.hp-damage);
     const cause={id:unit.id,name:unit.kind==='hound'?'机器狗':'无人机',color:'#ff6f44',soldier:unit.kind==='hound'?'hound':'drone'};
     send(target.ws,{type:'damaged',amount:damage,hp:target.hp,bossDamage:true,from:{...cause,pos:origin}});
+    squad.hurt(target,damage,now,origin);
     if(target.hp<=0)killPlayer(target,null,now,cause);
   },
   destroy(player, unit, floor, now) {
@@ -1099,6 +1108,32 @@ const sharedPatrols = require('../services/sharedPatrols').createSharedPatrols({
     }
     try { gold.awardMachineKill(player,unit.map,{x:unit.x,y:landing.y,z:unit.z},now); }
     catch (error) { console.error('[patrol] reward failed',error.message); }
+  }
+});
+
+const squad = createSquad({
+  players: () => players.values(),
+  mapKey: mapKeyOf,
+  fire(member, origin, dir, target, owner) {
+    broadcast({ type: 'squadShot', id: member.id, owner: owner.id, role: member.role, origin, dir },
+      player => player.joined && mapKeyOf(player) === mapKeyOf(owner));
+  },
+  damageTarget(map, id, amount, now, shooter) {
+    return sharedPatrols.damageUnit(map, id, amount, now, shooter);
+  },
+  // 小队只打巡逻怪：门户 Boss 由玩家自己处理，服务端没有按 id 结算的接口。
+  targets(map) {
+    return sharedPatrols.snapshot(map).map(unit => ({
+      id: unit.id, x: unit.x, y: unit.y, z: unit.z, kind: unit.kind
+    }));
+  },
+  heal(owner, amount) {
+    if (!owner || !owner.alive) return;
+    owner.hp = Math.min(MAX_HP, owner.hp + amount);
+  },
+  notify(kind, member, owner) {
+    if (!owner || !owner.ws || owner.ws.readyState !== 1) return;
+    send(owner.ws, { type: 'squadNotice', kind, id: member.id, role: member.role, label: member.label });
   }
 });
 
@@ -1288,7 +1323,8 @@ function handleMessage(player, raw) {
     }
     return;
   }
-  if (player.focusUntil > now && msg.type !== 'ping' && msg.type !== 'join' && msg.type !== 'focusEnd' && msg.type !== 'ammoMode') {
+  if (player.focusUntil > now && msg.type !== 'ping' && msg.type !== 'join' && msg.type !== 'focusEnd' &&
+      msg.type !== 'ammoMode' && msg.type !== 'squadMode' && msg.type !== 'godMode') {
     send(player.ws, focusPayload(player, { scope: player.focusKind || 'manual', denied: true }));
     return;
   }
@@ -1322,6 +1358,7 @@ function handleMessage(player, raw) {
       }
       player.joined = true;
       player.infiniteAmmo = msg.infiniteAmmo === true;
+      player.godMode = MODS_ENABLED && msg.godMode === true;
       player.frontier = msg.frontier === true;
       player.portalFall = msg.portalFall === true;
       const focused = player.focusUntil > now;
@@ -1717,7 +1754,7 @@ function handleMessage(player, raw) {
       player.inQingyun = false;
       player.mapId = map.id;
       player.pos = { ...map.landing };
-      player.yaw = 0;
+      player.yaw = map.arrivalYaw ?? 0;
       player.pitch = 0;
       player.moving = player.sprint = false;
       player.shotCredits = 0;
@@ -1915,8 +1952,22 @@ function handleMessage(player, raw) {
       }
       break;
     }
+    case 'squadMode': {
+      if (player.joined && typeof msg.enabled === 'boolean') player.squadEnabled = msg.enabled;
+      break;
+    }
+    case 'squadRevive': {
+      if (!player.joined || !player.active || !player.alive) break;
+      if (typeof msg.id !== 'string') break;
+      squad.revive(player, msg.id, now);
+      break;
+    }
     case 'ammoMode': {
       if (player.joined && typeof msg.infinite === 'boolean') player.infiniteAmmo = msg.infinite;
+      break;
+    }
+    case 'godMode': {
+      if (player.joined && typeof msg.enabled === 'boolean') player.godMode = MODS_ENABLED && msg.enabled;
       break;
     }
     case 'shot': {
@@ -2415,6 +2466,7 @@ function tick() {
   syncFollowingPlayers(now);
   portalBosses.tick(now);
   sharedPatrols.tick(now);
+  squad.tick(now, TICK_MS / 1000);
   deathReplay.recordPlayers(players.values(), now, frontier.equipmentFlags);
   deathReplay.prune(now);
   const rosterRows = rosterPayloadBase(now);
@@ -2483,6 +2535,8 @@ function tick() {
       bossBounty,
       bosses: bossesByMap.get(key),
       patrols: patrolsByMap.get(key),
+      squads: squad.snapshot(key),
+      mods: { god: MODS_ENABLED },
       you: {
         id: player.id,
         name: player.name,
