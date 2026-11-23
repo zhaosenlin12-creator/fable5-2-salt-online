@@ -18,7 +18,6 @@ const { isInsideAirWall, PORT_PLAYER_START, PORT_SPAWN_YAW } = require('../publi
 const { randomUUID } = require('node:crypto');
 const moderation = require('../services/moderation').createModeration();
 const houndTuning = require('../services/houndTuning');
-const playSchedule = require('../services/playSchedule');
 moderation.ready.catch(error => console.error('[moderation] load failed:', error.message));
 const pendingAutomaticBans = new Set();
 function monitor(player, kind, now) {
@@ -1145,7 +1144,6 @@ const shop = createShop({ players, send, gold,
     broadcast({ type: 'soldierState', id: player.id, soldier: player.soldier, outfit: player.outfit });
   }
 });
-const portContainerAds = require('../services/portContainerAds');
 const containers = require('../services/containers')({ send, players, frontier, gold, shop });
 const sedan = require('../services/sedan')(players, send, frontier.dropping, shop.enter);
 
@@ -1335,18 +1333,6 @@ function handleMessage(player, raw) {
   switch (msg.type) {
     case 'join': {
       if (player.joined) { monitor(player, 'repeatJoin', now); break; }
-      const schedule = playSchedule.statusAt(now);
-      if (schedule.blocked) {
-        send(player.ws, {
-          type: 'scheduleBlocked',
-          blocked: true,
-          remainingMs: schedule.remainingMs,
-          nextPlayableAt: schedule.nextPlayableAt,
-          serverNow: schedule.serverNow,
-          timeZone: schedule.timeZone
-        });
-        break;
-      }
       const resumed = player.reconnecting === true;
       player.reconnecting = false;
       const requested = sanitizeName(msg.name);
@@ -1882,16 +1868,6 @@ function handleMessage(player, raw) {
     case 'goldHit':
       if (player.active && player.alive) gold.shoot(player, playerAuthority.takeReportedShot(player, now), msg.id, now);
       break;
-    case 'containerAdQuote': {
-      const { request, box, side } = msg;
-      try {
-        send(player.ws, { type: 'containerAdQuote', request, ...portContainerAds.quote(player, box, side, gold, now) });
-      } catch (error) {
-        console.error('[port-container-ads] quote failed:', error.message);
-        send(player.ws, { type: 'containerAdQuote', request, error: 'storage' });
-      }
-      break;
-    }
     case 'containerList':
     case 'containerAction':
       containers.handle(player, msg, now);

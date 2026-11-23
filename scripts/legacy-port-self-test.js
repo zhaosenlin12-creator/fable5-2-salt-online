@@ -22,14 +22,11 @@ const en = JSON.parse(read('locales/en-US.json'));
 
 for (const file of [
   'public/js/classic-avatar.js',
-  'public/js/community.js',
   'public/js/death-replay-3d.js',
   'public/js/kill-streak.js',
   'public/js/replay.js',
-  'public/css/community.css',
   'public/css/replay.css',
-  'public/css/mobile.css',
-  'public/img/saltline-wechat-group.svg'
+  'public/css/mobile.css'
 ]) {
   assert.ok(exists(file), file + ' 必须存在');
 }
@@ -38,7 +35,6 @@ for (const file of ['public/js/compat-game.js', 'public/css/compat.css']) {
   assert.ok(!exists(file), file + ' 必须移除');
 }
 
-assert.match(bootGate, /'community\.js'/, '启动门控必须加载社区脚本');
 assert.match(bootGate, /'kill-streak\.js'/, '启动门控必须加载连杀播报');
 assert.match(bootGate, /'replay\.js'/, '启动门控必须加载本地回放');
 assert.match(bootGate, /'death-replay-3d\.js'/, '启动门控必须加载 3D 死亡回放');
@@ -124,7 +120,6 @@ console.log(JSON.stringify({
   ok: true,
   oldNetworkingPreserved: true,
   portableFeatures: [
-    'community',
     'kill-streak',
     'local-replay',
     'android-market',

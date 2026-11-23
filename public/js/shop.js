@@ -101,31 +101,11 @@
     }
   }
 
-  function mountAdEditor() {
-    const template = document.getElementById('shop-race-ads');
-    grid.append(template.content.cloneNode(true));
-    window.SaltRaceAdEditor(grid.querySelector('.ads-page'), {
-      confirm: (title, message) => new Promise(resolve => openPurchaseNotice(title, message, { resolve })),
-      notify: (title, message) => {
-        if (dialog.open && category === 'raceAd') openPurchaseNotice(title, message);
-      },
-      updateBalance: value => {
-        balance = value;
-        updateWallet();
-      }
-    });
-  }
-
   function drawProducts() {
     tabs.querySelectorAll('button').forEach(button =>
       button.setAttribute('aria-pressed', String(button.dataset.category === category)));
     grid.replaceChildren();
     grid.dataset.category = category;
-    if (category === 'raceAd') {
-      mountAdEditor();
-      updateWallet();
-      return;
-    }
     for (const product of Object.values(products)) {
       if (product.kind !== category) continue;
       const card = make('article', 'shop-card');
@@ -177,13 +157,10 @@
     const close = make('button', 'shop-close', tr('关闭', 'Close'));
     close.type = 'button';
     close.addEventListener('click', () => dialog.close());
-    dialog.addEventListener('close', () => {
-      if (grid.dataset.category === 'raceAd') grid.replaceChildren();
-    });
     header.append(title, funds, close);
     tabs = make('nav', 'shop-tabs');
     tabs.setAttribute('aria-label', tr('商品分类', 'Product categories'));
-    for (const [id, name] of [['sign', tr('路牌样式', 'Road Signs')], ['outfit', tr('服装', 'Outfits')], ['pass', tr('月球通行证', 'Lunar Pass')], ['raceAd', tr('赛道箱体广告', 'Track Container Ads')]]) {
+    for (const [id, name] of [['sign', tr('路牌样式', 'Road Signs')], ['outfit', tr('服装', 'Outfits')], ['pass', tr('月球通行证', 'Lunar Pass')]]) {
       const tab = make('button', '', name);
       tab.type = 'button'; tab.dataset.category = id;
       tab.addEventListener('click', () => { category = id; status.textContent = ''; drawProducts(); });

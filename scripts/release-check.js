@@ -36,7 +36,6 @@ const required = [
   'API.md',
   'routes/api.js',
   'routes/admin.js',
-  'services/groupQr.js',
   'services/serverBackup.js',
   'services/adminCredentials.js',
   'views/admin.ejs',
@@ -46,10 +45,6 @@ const required = [
   'services/goldSupply.js',
   'public/js/gold-supply.js',
   'public/css/gold-supply.css',
-  'services/playSchedule.js',
-  'public/js/play-schedule.js',
-  'public/css/play-schedule.css',
-  'scripts/play-schedule-self-test.js',
   'views/race.html',
   'views/settings-panel.ejs',
   'public/css/settings-panel.css',
@@ -75,8 +70,6 @@ const required = [
   'public/css/manual-rotate.css',
   'public/js/audio-tap.js',
   'public/js/replay.js',
-  'public/js/community.js',
-  'public/js/admin-qr.js',
   'public/js/modal.js',
   'public/css/modal.css',
   'public/race/history.js',
@@ -136,9 +129,9 @@ if (pkg) {
   const allowed = new Set([
     'express', 'ejs', 'dotenv', 'cors', 'helmet', 'compression', 'morgan',
     'ws', 'socket.io', 'jsonwebtoken', 'bcryptjs', 'express-rate-limit',
-    'validator', 'sanitize-html', 'multer', 'mime-types', 'archiver',
+    'validator', 'sanitize-html', 'mime-types', 'archiver',
     'adm-zip', 'axios', 'dayjs', 'lodash', 'uuid', 'write-file-atomic',
-    'proper-lockfile', 'sharp', 'qrcode', 'nodemailer', 'cheerio', 'pdfkit',
+    'proper-lockfile', 'sharp', 'nodemailer', 'cheerio', 'pdfkit',
     'exceljs'
   ]);
   for (const dependency of Object.keys(pkg.dependencies || {})) {
@@ -169,9 +162,6 @@ for (const [name, dictionary] of [['zh-CN', zh], ['en-US', en]]) {
     if (!dictionary[section] || typeof dictionary[section] !== 'object') {
       fail('locales/' + name + '.json 缺少 i18n 分区: ' + section);
     }
-  }
-  if (!dictionary.playSchedule || typeof dictionary.playSchedule !== 'object') {
-    fail('locales/' + name + '.json 缺少 playSchedule 分区');
   }
 }
 

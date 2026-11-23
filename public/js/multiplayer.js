@@ -4281,15 +4281,6 @@
         applyUnitSelection();
         break;
       }
-      case 'scheduleBlocked': {
-        window.SaltPlayGate?.applyStatus(msg);
-        // Dismissing the dialog should reveal the home screen without retrying
-        // join immediately; only resume the join once the play window opens.
-        window.SaltPlayGate?.whenPlayable(() => {
-          if (connected && !everJoined) sendJoin();
-        });
-        break;
-      }
       case 'joined': {
         const acceptedRename = msg.renamed === true || !!pendingRename;
         const filtered = msg.filtered === true;

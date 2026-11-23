@@ -1,5 +1,14 @@
 # 变更日志
 
+## v1.36.0 — 2026-11-24
+
+- 移除「工作时间段」不可游玩限制：删除首页阻断弹窗（倒计时卡片）、`/api/game/play-schedule` 接口与服务端 `scheduleBlocked` 入场拦截，不再按北京时间工作时段或节假日封锁游戏，任何时间都能直接部署进入对局。
+- 移除港口集装箱广告投放：删除客户端「印广告」面板、服务端 `services/portContainerAds.js`、`/api/game/container-ads*` 接口、`/admin/container-ads` 审核后台与 `containerAdQuote` 联机消息；集装箱表面不再绘制任何广告贴图。
+- 移除赛车赛道箱体广告位：删除 `/api/race/ads*` 接口、`services/raceAds.js`、`public/race/ads.js` / `ads.css` / `ad-rules.js` 与 `views/race-ads.ejs`，赛车页不再每 20 秒拉取广告位；商店里的「赛道箱体广告」页签一并移除，商店只保留路牌样式、服装与月球通行证。
+- 移除微信群二维码推广：删除标题页 / 暂停菜单 / 士兵选择页的二维码入口、`public/js/community.js` 与样式、`/api/community/qr*` 接口、`/admin/qr` 后台与内置二维码图片。
+- 清理随之失效的词条与脚本：`locales/zh-CN.json` 与 `locales/en-US.json` 移除 `playSchedule` / `raceAds` / `community` 分区及 `admin.containerAds*` / `admin.qr*` 键位；删除 `scripts/play-schedule-self-test.js` 与 `scripts/port-container-ad-pause-self-test.js`，`npm run check` 与 `scripts/release-check.js` 同步更新。
+- 玩法零改动：赛车、小队 AI 队友、好友跟随、语音、回放、商店、路牌与皮肤、前沿战场等全部保留；修复了「工作时间段」封锁期间所有 WebSocket 自测无法入场的连带问题。
+
 ## v1.35.0 — 2026-11-23
 
 - 新增远征地图「度假岛·船厂」：热带海岛地形、在建豪华游轮船厂、塔吊与集装箱堆、度假村别墅与泳池、椰林与礁石，浅海与沙滩可涉水前进；落点与回程门按服务端地形表结算。

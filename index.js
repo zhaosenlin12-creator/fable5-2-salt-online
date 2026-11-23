@@ -13,9 +13,7 @@ const chatHistory = require('./services/chatHistory');
 const focusMode = require('./services/focusMode');
 const bulletMarks = require('./services/bulletMarks');
 const persistenceQueue = require('./services/persistenceQueue');
-const groupQr = require('./services/groupQr');
 const houndTuning = require('./services/houndTuning');
-const playSchedule = require('./services/playSchedule');
 const roadSigns = require('./services/roadSigns');
 const { attachMultiplayer, shutdownMultiplayer } = require('./realtime/multiplayer');
 const { version: RELEASE_VERSION } = require('./package.json');
@@ -99,7 +97,6 @@ app.use((req, res, next) => {
 
 app.use('/admin', adminRouter);
 app.use('/api/race', raceRouter);
-app.get('/race-ads',(req,res)=>res.redirect('/'));
 app.get('/race/models/:kind', (req,res,next) => {
   if (!['hound','drone'].includes(req.params.kind)) return next();
   res.set('Content-Type','application/json');
@@ -190,12 +187,10 @@ function renderGame(req, res, raceTransfer, raceStart = '') {
     },
     lang,
     messages: locales[lang] || locales['zh-CN'],
-    groupQr: groupQr.info(),
     raceTransfer,
     raceStart,
     preloadQingyun: raceTransfer === 'qingyun',
     houndFlipChance: houndTuning.read().chance,
-    playSchedule: playSchedule.status(),
     assetVersion: ASSET_VERSION
   });
 }
@@ -271,7 +266,6 @@ function shutdown(signal) {
   chatHistory.flush();
   focusMode.flush();
   bulletMarks.flush();
-  groupQr.flush();
   persistenceQueue.flush();
   persistenceQueue.shutdown();
   server.close(() => process.exit(0));

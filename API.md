@@ -9,11 +9,11 @@
 - 实时通信：同端口 WebSocket，玩家路径 `/ws`，延迟探测路径 `/ws?probe=1`
 - 数据格式：WebSocket 文本帧为 JSON；玩家语音为二进制 PCM 帧
 - 国际化：`lang` cookie，可选 `zh-CN` / `en-US`；接口提示文案随语言变化
-- 持久化目录：优先使用托管平台注入的 `JICREATE_DATA_DIR`，其次 `DATA_DIR`，本地开发回退到项目内 `data/`。排行榜写入 `data/leaderboard.json`，大字历史追加写入 `data/chat-history.jsonl`，专注记录写入 `data/focus-records.json`，金币拾取与互赠公示追加写入 `data/gold-ledger.jsonl`，盐港尸体追加写入 `data/corpse-field.jsonl`，节假日表写入 `data/holidays.json`，并兼容读取历史 `data/gold-pickups.json`，后台上传的群聊二维码（base64）写入 `data/group-qr.json`，统一由 `config/storage.js` 原子读写。项目内 `data/` 会自动调整为 `2777` 目录权限，数据文件为 `0664`，避免临时托管重复测试时因跨服务账号无法清理运行数据而还原失败；外部 `JICREATE_DATA_DIR` 不改权。
+- 持久化目录：优先使用托管平台注入的 `JICREATE_DATA_DIR`，其次 `DATA_DIR`，本地开发回退到项目内 `data/`。排行榜写入 `data/leaderboard.json`，大字历史追加写入 `data/chat-history.jsonl`，专注记录写入 `data/focus-records.json`，金币拾取与互赠公示追加写入 `data/gold-ledger.jsonl`，盐港尸体追加写入 `data/corpse-field.jsonl`，并兼容读取历史 `data/gold-pickups.json`，统一由 `config/storage.js` 原子读写。项目内 `data/` 会自动调整为 `2777` 目录权限，数据文件为 `0664`，避免临时托管重复测试时因跨服务账号无法清理运行数据而还原失败；外部 `JICREATE_DATA_DIR` 不改权。
 - 落盘策略：大字历史仍同步追加并 `fsync` 后再广播；盐港弹痕与尸体先更新内存，再由独立 worker 线程异步追加 JSONL、重试和压缩，写回回调清除 `pending` 状态，因此 HTTP 历史/增量接口中的 `persisted` 可能短暂为 `false`。worker 不可用时回退主线程写入，异常退出时回放未确认记录，避免弹痕或尸体丢失。大字目录不可写时仍立即广播并进入进程内重试队列，每 4 秒自动重试并通过 `chatWarning` 提醒发送者。进程收到 `SIGTERM` / `SIGINT` 时会 flush 所有写入队列并同步排行榜与大字文件。
 - API 缓存：`/api/*` 统一返回 `Cache-Control: no-store`，避免历史分页被浏览器或代理缓存成空列表。
 - 内容安全：玩家代号与全服大字在服务端统一做敏感词过滤；拆字、全角、零宽字符、符号替代与常见同形字规避同样会被识别。
-- 当前版本：`1.34.62`。工作时间段弹窗改为可关闭的横屏左右分栏卡片，关闭后可继续浏览主页；工作时间段内点击「开始行动」会重新校验开放时段并再次弹出倒计时。HUD 在线状态按其他玩家计数，只有自己在线时显示「无人在线」；战场名单自己的行可切换「匿名在线」，其他玩家只会收到匿名占位代号。北京时间周一至周五 `00:00–07:00`、`09:00–12:00`、`14:00–18:00` 为工作时间，首页会显示不可游玩倒计时；周末与落在周一至周五的节假日全天开放。
+- 当前版本：`1.36.0`。移除全部与游戏无关的广告、推广与限时准入：工作时间段阻断弹窗及其服务端准入校验（不再有「不可游玩」状态，随时可部署）、港口集装箱广告投放与审核、赛车赛道箱体广告位与商店广告入口、微信群二维码推广入口（标题页 / 暂停菜单 / 士兵选择页）与管理后台。商店仅保留路牌样式、服装与月球通行证，赛车、小队、好友、语音、回放等玩法不受影响。HUD 在线状态按其他玩家计数，只有自己在线时显示「无人在线」；战场名单自己的行可切换「匿名在线」，其他玩家只会收到匿名占位代号。
 
 ## 页面
 
@@ -31,7 +31,7 @@
 - 空中换兵：无人机在空中切换操作单位时先保存选择，再立即在随机地面点位复活。
 - 盐港随机复活：客户端在阵亡和请求复活前按 `G.physics.nav` 导航网格重新采样整张港口的可行走地面点，并校验碰撞盒净空；服务端过滤高空点与 Boss 危险区，在同样安全的候选点中随机选择。
 - 无限弹药：启用后备弹保持无限，但弹夹仍正常消耗，打空后必须等待自动或手动换弹。
-- 说明：多人 3D 港口枪战首页。玩家可直接部署，并通过“设置 → 操控单位”在男女士兵、机器狗、无人机和方块人之间切换；未主动选择时默认方块人。方块人沿用男士兵的移动、命中、伤害与复活参数。其他玩家看到的机器狗与无人机直接复用游戏内的骨骼单位模型；若首个快照早于模型模块加载，客户端会持续等待并自动替换临时兜底。页面提供社区二维码、1–6 连杀播报、含游戏音效的本地录制回放和 Three.js 三维死亡回放；本地回放通过 `audio-tap.js` 将游戏 WebAudio 主输出分流到录制流，视频与音轨均只保存在浏览器 IndexedDB，不读取麦克风。死亡回放使用服务端录制的双方权威轨迹与真实射击、命中事件重建港口集装箱、吊机、灯塔和击杀过程，并提供追踪镜头与播放进度。无人机近地搜索灯与机械单位坠毁均为客户端表现。游戏仅使用 WebGL2 + Three.js 三维渲染，不提供 Canvas 2D 兼容模式，也不再识别 `?gfx=2d` / `?render=2d`；WebGL2 不可用时显示启动错误。移动、命中、快照、限频、反作弊、语音与专注锁定继续使用 v1.23.0 算法。游戏内标题页、暂停菜单与战场名单面板均提供 GitHub 仓库链接 `https://github.com/wenzhengshi/fable5-2-salt-online`。
+- 说明：多人 3D 港口枪战首页。玩家可直接部署，并通过“设置 → 操控单位”在男女士兵、机器狗、无人机和方块人之间切换；未主动选择时默认方块人。方块人沿用男士兵的移动、命中、伤害与复活参数。其他玩家看到的机器狗与无人机直接复用游戏内的骨骼单位模型；若首个快照早于模型模块加载，客户端会持续等待并自动替换临时兜底。页面提供 1–6 连杀播报、含游戏音效的本地录制回放和 Three.js 三维死亡回放；本地回放通过 `audio-tap.js` 将游戏 WebAudio 主输出分流到录制流，视频与音轨均只保存在浏览器 IndexedDB，不读取麦克风。死亡回放使用服务端录制的双方权威轨迹与真实射击、命中事件重建港口集装箱、吊机、灯塔和击杀过程，并提供追踪镜头与播放进度。无人机近地搜索灯与机械单位坠毁均为客户端表现。游戏仅使用 WebGL2 + Three.js 三维渲染，不提供 Canvas 2D 兼容模式，也不再识别 `?gfx=2d` / `?render=2d`；WebGL2 不可用时显示启动错误。移动、命中、快照、限频、反作弊、语音与专注锁定继续使用 v1.23.0 算法。游戏内标题页、暂停菜单与战场名单面板均提供 GitHub 仓库链接 `https://github.com/wenzhengshi/fable5-2-salt-online`。
 - 缓存：`Cache-Control: no-store`
 
 ### 盐港赛车
@@ -58,13 +58,6 @@
 - 路径：`/version`
 - 说明：返回当前运行进程使用的静态资源版本字符串，例如 `20261120-merge-flip-gfx-roster-wreck-selectui-tablang-houndfix-selectfit-v1.34.26`；用于确认浏览器缓存与服务端源码版本一致，不写入持久化数据。
 - 缓存：`Cache-Control: no-store`
-
-### 箱体广告投放
-
-- 方法：`GET`
-- 路径：`/race-ads`
-- 说明：兼容旧入口，统一返回 `302 /`。实际投放面板集成在游戏首页商店中，加载 `/race/ads.css`、`/race/ad-rules.js` 与 `/race/ads.js`；选定箱体后可预览文字与涂装，并以随身盐线币支付投放费用。
-- 说明：已投放广告由赛车页面通过 `/api/race/ads` 每 20 秒同步一次，并按服务端时间处理到期；广告文字直接绘制在对应集装箱表面。
 
 ### 静态资源
 
@@ -113,13 +106,6 @@
 - `GET /admin/tuning`：需要管理员会话且已完成首次密码修改；显示机械猎犬被击杀后「后空翻」概率的来源、当前生效值与默认值，`?result=saved` 表示上次保存成功。
 - `POST /admin/tuning`：表单字段 `csrf`、`percent`，取值 `0..100`，支持一位小数；原子保存到 `data/hound-tuning.json` 并向在线玩家广播 `houndFlip` 热更新，成功后返回 `303 /admin/tuning?result=saved`。非法值返回包含错误提示的调参页；环境变量 `HOUND_FLIP_CHANCE` 优先于后台保存值。
 
-### 群聊二维码管理
-
-- `GET /admin/qr`：需要管理员会话且已完成首次密码修改；显示当前二维码预览、来源、文件名、大小与更新时间，并提供上传和恢复默认表单。
-- `POST /admin/qr`：`multipart/form-data`，字段 `csrf`、`image`。仅接受 PNG / JPG / WebP / GIF（按文件头识别），单文件最大 4 MB；上传成功返回后台二维码管理页并显示成功提示。缺少文件、类型不符或超限返回 `400`，CSRF 失效返回 `403`，存储失败返回 `500`。
-- `POST /admin/qr/reset`：表单字段 `csrf`；清空上传的二维码，恢复使用内置 `/img/saltline-wechat-group.svg`。
-- 上传的图片以 base64 存入 `data/group-qr.json`，由 `config/storage.js` 原子写入并加锁；托管环境把 `data/` 固定在版本目录之外，因此升级源码与重启服务不会丢失二维码。
-
 ## 内容安全与敏感词拦截
 
 - 生效范围：`join` / `rename` 的玩家代号、`chat` 全服大字、从 `data/chat-history.jsonl` 载入的历史大字，以及从 `data/leaderboard.json` 载入的历史排行榜代号。
@@ -138,20 +124,6 @@
 - 路径：`/api/health`
 - 参数：无
 - 返回示例：`{"ok":true,"message":"服务正常","lang":"zh-CN","uptimeSeconds":12}`
-
-### 游玩开放时段
-
-- 方法：`GET`
-- 路径：`/api/game/play-schedule`
-- 参数：无
-- 时区：固定按北京时间 `Asia/Shanghai`（UTC+8）判断，不受访问者本机时区影响。
-- 规则：周一至周五 `00:00–07:00`、`09:00–12:00`、`14:00–18:00` 不可游玩；`07:00–09:00`、`12:00–14:00`、`18:00–次日 00:00` 可游玩。周六、周日全天可游玩；节假日若落在周一至周五，同样全天可游玩。
-- 节假日数据：首次读取时自动写入 `data/holidays.json`，格式为 `{"holidays":[{"date":"2026-10-01","name":"国庆节"}]}`；文件由 `config/storage.js` 原子写入，升级源码不会清空。服务端会把内置节假日与文件记录合并，文件可补充后续年份或临时假日。
-- 返回字段：`ok`、`lang`、`blocked`、`playableNow`、`reason`、`serverNow`、`serverNowLocal`、`date`、`weekday`、`weekdayLabel`、`weekend`、`holiday`、`holidayName`、`workday`、`activeWindow`、`windows[]`、`nextPlayableAt`、`nextPlayableLocal`、`remainingMs`、`holidayCount`、`schedule`。
-- `remainingMs` 是距离当前工作时段结束、可以重新游玩的毫秒数；非封锁状态为 `0`。`schedule` 重复给出时区、工作时段、节假日数量与 `storage` 文件名，便于客户端与运维核对。
-- 首页在服务端渲染时直接注入同一份状态；封锁期间先展示横屏开放时段弹窗与“天 / 小时 / 分 / 秒”倒计时。弹窗支持右上角关闭、点击遮罩关闭与 `Esc` 关闭；手机竖屏打开弹窗时会临时转为横屏显示，关闭后恢复原屏幕方向。关闭弹窗后启动并进入主页，但工作时间段内点击「开始行动」会再次打开弹窗，不会进入对局。页面打开期间每 5 秒重新校验；对局进行中进入工作时段会暂停并显示弹窗。
-- WebSocket：封锁期间发送 `join` 不建立入场合约，服务端返回 `{"type":"scheduleBlocked","blocked":true,"remainingMs":...,"nextPlayableAt":...,"serverNow":...,"timeZone":"Asia/Shanghai"}`，客户端据此显示同一倒计时层。
-- 返回示例：`{"ok":true,"lang":"zh-CN","blocked":true,"playableNow":false,"reason":"work-hours","timeZone":"Asia/Shanghai","serverNow":1795399200000,"serverNowLocal":"2026-11-23T10:00:00+08:00","date":"2026-11-23","weekday":1,"weekdayLabel":"周一","weekend":false,"holiday":false,"holidayName":"","workday":true,"activeWindow":{"start":"09:00","end":"12:00"},"windows":[{"start":"00:00","end":"07:00"},{"start":"09:00","end":"12:00"},{"start":"14:00","end":"18:00"}],"nextPlayableAt":1795406400000,"nextPlayableLocal":"2026-11-23T12:00:00+08:00","remainingMs":7200000,"holidayCount":92}`
 
 ### 游戏元信息
 
@@ -276,13 +248,6 @@
 - 盐港尸体全部通过分页 HTTP 接口同步，不再通过 WebSocket 下发历史或增量：客户端首次进入按 `history=1` 每页 40 条、约 120 ms 一页缓慢取回全部历史，页面取完后以首次响应的 `baseCursor` 做一次增量对账，确保分页期间新增或更新的尸体不遗漏；之后每 2.5 秒通过 `since=<cursor>` 获取新增及修改记录。无变化时返回 HTTP 204，游标失效时返回 `reset: true` 并重新分页。模型仍按每帧 3 个分帧创建，分页请求与连接实时快照互不阻塞。
 - 返回示例：`{"ok":true,"lang":"zh-CN","map":"port","total":2,"revision":2,"cursor":"e1:2","limit":40,"baseCursor":"e1:2","complete":true,"nextBefore":0,"corpses":[{"id":"c2","seq":2,"at":1794500000000,"map":"port","kind":"hound","pos":{"x":12.4,"y":0.1,"z":-8.1},"yaw":1.2,"playerId":"","name":"","soldier":"classic","outfit":"","victimId":"machine-4","shooterId":"p3","shooterName":"RAVEN-42","pose":{"yaw":1.2,"bodyPos":[0.01,0.36,0],"bones":{"body":[0,0.2,0,0.9798],"head":[0.05,0,0,0.9987]}},"persisted":true}]}`
 
-### 盐港集装箱广告
-
-- 玩家靠近并瞄准盐港固定集装箱长侧面，点击「印广告」或按 9（主键盘 `Digit9` 或小键盘 `Numpad9`）。选纯文字或横版图片，按每 24 小时 0.1 枚盐线币支付。图片在客户端压缩为横版 JPEG，服务端限制为 200,000 字节。弹窗打开时会解除鼠标锁定但不会触发暂停；手机端打开系统图片选择器导致页面暂时隐藏时也不会自动暂停，关闭或取消后按原状态恢复锁定。
-- 客户端通过 `containerAdQuote` 发送 `box,side,request` 取得绑定当前联机会话与侧面的短期凭证，再请求 `POST /api/game/container-ads`（multipart 的 `mode,days,text/image`，请求头 `X-Container-Ad-Ticket`）。同一凭证重试不会重复扣款。
-- `GET /api/game/container-ads?since=...` 返回有效广告元数据，版本一致时返回 204。图片通过版本化路径单独下载；广告投放或撤下不改变弹痕数据。
-- `/admin/container-ads` 可审核。新广告默认通过；标记不通过时原广告位显示「该广告违规」，直至恢复通过或投放到期。
-
 ### 问候接口
 
 - 方法：`GET`
@@ -308,21 +273,6 @@
 - 容错说明：托管数据目录或文件锁暂时不可写时，服务端仍会立即建立内存锁定并返回成功，`persisted` 为 `false`；记录会每 4 秒自动重试原子写入，进程收到 `SIGTERM` / `SIGINT` 时也会再次补写。单次 WebSocket 会话同步异常同样不会改变成功状态码。
 - 返回示例：`{"ok":true,"now":1794500000000,"reused":false,"persisted":true,"sessions":1,"focus":{"active":true,"durationMs":1800000,"record":{"id":"focus_m7x2_a1b2c3d4","clientId":"c_...","fingerprint":"fp1-ab…9f2c","ip":"203.0.*.*","startedAt":1794500000000,"expiresAt":1794501800000,"durationMs":1800000,"remainingMs":1800000,"kind":"manual","trigger":"manual","playMs":0,"active":true}},"message":"手动专注模式已开启，30 分钟内只能观战"}`
 
-### 查询玩家群聊二维码
-
-- 方法：`GET`
-- 路径：`/api/community/qr`
-- 说明：返回当前二维码的来源与元信息，不返回图片二进制；首页会在渲染时把同样的数据注入 `window.__SALT_I18N__.groupQr`，游戏内入口据此请求图片。
-- 返回字段：`ok`、`qr.custom`（是否使用后台上传图片）、`qr.url`（图片地址）、`qr.api`、`qr.defaultUrl`、`qr.version`、`qr.fileName`、`qr.mimeType`、`qr.bytes`、`qr.updatedAt`
-- 返回示例：`{"ok":true,"qr":{"custom":false,"url":"/img/saltline-wechat-group.svg","api":"/api/community/qr/image","defaultUrl":"/img/saltline-wechat-group.svg","version":"default","fileName":"saltline-wechat-group.svg","mimeType":"image/svg+xml","bytes":0,"updatedAt":""}}`
-
-### 获取玩家群聊二维码图片
-
-- 方法：`GET`
-- 路径：`/api/community/qr/image`（支持可选 `?v=<version>` 用于刷新缓存）
-- 说明：后台上传过图片时返回该图片的原始字节与对应 `Content-Type`；未上传时返回内置 SVG。响应继承 `/api/*` 的 `no-store` 缓存策略。
-- 状态码：`200`
-
 ### 切换语言
 
 - 方法：`POST`
@@ -344,14 +294,6 @@
 - `GET /api/race/history`：要求有效的路牌身份 Cookie，无请求体。返回 `ok: true`、`you`（当前玩家的脱敏 ID）、`pot`（当前奖池）、`boss`（当前赏金 BOSS 状态）、`totals`（`races` 总场次、`finished` 完赛场次、`participants` 参赛人数、`prizes` 累计发放奖金、`bossSpawns` 赏金 BOSS 刷新次数、`bossRewards` 已领取赏金）、`top5` 与 `participants`。`top5` 按历史最佳成绩排序，每项含 `rank`、`id`、`name`、`bestMs`、`wins`、`winnings`、`races`；`participants` 按最近参赛时间倒序，每项含 `id`、`name`、`races`、`wins`、`winnings`、`bestMs`、`lastAt`。`id` 是稳定的脱敏身份，`name` 是当前可改名玩家名称，改名后历史行同步显示新名称；未设置名称时客户端回退显示 `id`。放弃或超时的报名也计入参赛名单，但没有成绩；破纪录奖金、赏金 BOSS 赏金与纪录保持者分成都会计入对应赛车手的 `winnings`。首页赛前查看入口、支付确认框的查看历史按钮与赛道结算入口共用该只读接口，查看历史不会报名、扣款或改变赛事状态。
 
 赛车报名、票券、榜单、奖池、赏金 BOSS 状态、结算回执与最近 500 场历史档案持久化在 `data/frontier-inventory.json` 的 `racing` 分区，统一由 `config/storage.js` 原子写入并加锁；赏金从 2 盐线币起，每刷新一次增加 0.5 盐线币，最高 5 盐线币，刷新与领取记录和奖池在同一笔写入中完成。全服最佳成绩独立保留在 `records` 中，即使历史档案逐步滚动，历史前 5 的成绩仍以 `records` 为准。可改名玩家名称按脱敏赛车身份保存在 `data/race-names.json`，联机加入、联机改名和赛车结算入口都会同步更新；名称经过长度限制与内容安全检查。
-
-### 箱体广告位
-
-广告位数据保存在 `data/frontier-inventory.json` 的 `raceAds` 分区，由 `config/storage.js` 原子读写；金额单位为微盐线币整数，`100000` 等于 `0.1` 盐线币。
-
-- `GET /api/race/ads`：公开接口，无请求体。返回 `bookings[]` 与 `now`（服务端时间戳）；每条投放含 `slot`、`text`、`color`、`expiresAt`，过期记录在读取时自动过滤。
-- `POST /api/race/ads/status`：要求有效的路牌身份 Cookie。无请求体。返回 `balance`、`daily`、`bookings[]` 与 `now`；`daily` 为单箱体单日价格。
-- `POST /api/race/ads/book`：要求有效的路牌身份 Cookie。Body 为 `{"slot":"<广告位 ID>","text":"<广告词>","color":"<颜色 ID>","days":<1-365>,"id":"<36 位请求幂等 ID>"}`。可选颜色为 `red`、`blue`、`teal`、`green`、`orange`、`grey`；广告词规范化后最多 36 字，并通过内容安全检查。成功时扣除随身余额，返回 `booking` 与最新 `balance`；相同 `slot` + `id` 的重复请求返回首次投放结果。失败返回 `409` 与 `error`，可为 `input`、`text`、`occupied` 或 `funds`。成功后服务端立即向在线玩家刷新钱包余额。
 
 ## WebSocket `/ws`
 

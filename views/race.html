@@ -290,7 +290,6 @@ progress::-webkit-progress-bar{background:#52616a}progress::-webkit-progress-val
   <ul id="race-roster-list"></ul>
 </dialog>
 <script>window.__SALT_I18N__ = <%- JSON.stringify({ lang: lang, messages: messages }).replace(/</g, '\\u003c') %>;</script>
-<script src="/race/ad-rules.js?v=<%= assetVersion %>"></script>
 <script type="importmap">{"imports":{"three":"/vendor/three-game.js"}}</script>
 <script src="/js/portal-visual.js?v=<%= assetVersion %>"></script>
 <script src="/js/portal-arrival.js?v=<%= assetVersion %>"></script>
@@ -7186,8 +7185,7 @@ function createPortRay(){const W=TrackThree.Vector3,e=[], i={};const oi={groundY
         const {length:size,width}=PortContainers.specs[kind];
         if(z+size>to+.001) break;
         const open=!opening&&rand()<.10 && index>=0;
-        const slot=bay===0?raceAds.at(index,side):null;
-        if(!open||slot) {
+        if(!open) {
           const height=opening
             ? side<0 ? [5,5,4,5,4][bay%5] : index<0 ? 1 : [1,1,3,4,3][bay%5]
             : 1+Math.floor(rand()*5);
@@ -7198,10 +7196,8 @@ function createPortRay(){const W=TrackThree.Vector3,e=[], i={};const oi={groundY
             const type=long&&rand()>.73?'container40hc':kind;
             const rightColors=['red','teal','white','yellow','red','green','blue'];
             const paletteColor=opening&&side<0 ? rightColors[(bay+level)%rightColors.length] : paint(paints);
-            const ad=level===0&&slot?activeAds.get(slot.id):null;
-            const item={x,y:top,z:center,yaw:side*Math.PI/2,kind:type,color:ad?.color||paletteColor};
+            const item={x,y:top,z:center,yaw:side*Math.PI/2,kind:type,color:paletteColor};
             sideBoxes.push(item);
-            if(ad)buildAdSurface(group,item,ad,side);
             top+=PortContainers.specs[type].height;
           }
         }
@@ -7237,68 +7233,11 @@ function createPortRay(){const W=TrackThree.Vector3,e=[], i={};const oi={groundY
     for(let i=first;i<=last;i++) if(!rows.has(i)) buildRow(i);
   }
 
-  const raceAds=window.SaltRaceAds;
-  let activeAds=new Map(), adServerOffset=0, expiryTimer=0;
-
-  function buildAdSurface(group,item,ad,side) {
-    const spec=PortContainers.specs[item.kind];
-    const map=texture(1024,256,(ctx,w,h)=>raceAds.drawLettering(ctx,w,h,ad.text,ad.color));
-    const material=new T.MeshBasicMaterial({map,transparent:true,depthWrite:false,alphaTest:.04});
-    const geometry=new T.PlaneGeometry(spec.length*.86,spec.height*.63);
-    const face=new T.Mesh(geometry,material);
-    face.name='race-ad-'+ad.slot;
-    face.position.set(item.x-side*(spec.width/2+.025),item.y+spec.height*.55,item.z);
-    face.rotation.y=-side*Math.PI/2;
-    group.add(face);
-    (group.userData.adSurfaces||=[]).push(face);
-  }
-
   function discardRow(index,row) {
     renderOrigin.remove(row);
     for(const mesh of row.children)mesh.dispose?.();
-    for(const face of row.userData.adSurfaces||[]){
-      face.geometry.dispose();
-      face.material.map.dispose();
-      face.material.dispose();
-    }
     rows.delete(index);
   }
-
-  function applyAds(bookings) {
-    const now=Date.now()+adServerOffset;
-    const next=new Map(bookings.filter(ad=>ad.expiresAt>now).map(ad=>[ad.slot,ad]));
-    const affected=new Set();
-    for(const id of new Set([...activeAds.keys(),...next.keys()])){
-      const old=activeAds.get(id), ad=next.get(id);
-      if(old?.expiresAt!==ad?.expiresAt||old?.text!==ad?.text||old?.color!==ad?.color) {
-        const slot=raceAds.byId.get(id);
-        if(slot)affected.add(slot.row);
-      }
-    }
-    activeAds=next;
-    for(const index of affected) {
-      const row=rows.get(index);
-      if(!row)continue;
-      discardRow(index,row);
-      buildRow(index);
-    }
-    clearTimeout(expiryTimer);
-    const soonest=Math.min(...Array.from(next.values(),ad=>ad.expiresAt));
-    if(Number.isFinite(soonest))expiryTimer=setTimeout(()=>applyAds([...activeAds.values()]),Math.min(2147483000,Math.max(1,soonest-now+20)));
-  }
-
-  async function reloadAds() {
-    try {
-      const response=await fetch('/api/race/ads',{cache:'no-store'});
-      if(!response.ok)return;
-      const {bookings,now}=await response.json();
-      if(!Array.isArray(bookings)||!Number.isFinite(now))return;
-      adServerOffset=now-Date.now();
-      applyAds(bookings);
-    }catch(error){/* retry on the next refresh */}
-  }
-  reloadAds();
-  setInterval(reloadAds,20000);
 
   const backdrop=PortVisual.backdrop(portMats,P.width+normal40.width*2+.12,-P.chunk,P.length+20);
   scene.add(backdrop.ground);

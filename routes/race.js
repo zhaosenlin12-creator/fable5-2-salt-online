@@ -3,13 +3,8 @@ const express=require('express');
 const signs=require('../services/roadSigns');
 const race=require('../services/race');
 const raceNames=require('../services/raceNames');
-const ads=require('../services/raceAds');
 const multiplayer=require('../realtime/multiplayer');
 const router=express.Router();
-router.get('/ads',(req,res)=>{
-  res.set('Cache-Control','no-store');
-  res.json(ads.listings());
-});
 router.use(express.json({limit:'512kb'}));
 router.use((req,res,next)=>{
   const headers=req.headers;
@@ -23,12 +18,6 @@ router.use((req,res,next)=>{
 });
 router.get('/plaza-ranking',(req,res)=>res.json(race.plazaRanking()));
 router.get('/history',(req,res)=>res.json(race.history(req.raceOwner)));
-router.post('/ads/status',(req,res)=>res.json(ads.status(req.raceOwner)));
-router.post('/ads/book',(req,res)=>{
-  const result=ads.book(req.raceOwner,req.body);
-  if(!result.error)multiplayer.refreshRaceWallets();
-  res.status(result.error?409:200).json(result);
-});
 for(const action of ['status','enter','start','abandon','finish']) {
   router.post('/'+action,async(req,res,next)=>{
     try{

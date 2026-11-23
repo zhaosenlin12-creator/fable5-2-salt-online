@@ -2,13 +2,11 @@
 
 const { randomBytes } = require('node:crypto');
 const express = require('express');
-const multer = require('multer');
 const credentials = require('../services/adminCredentials');
 const { createBackup } = require('../services/serverBackup');
 const { products } = require('../public/js/shop-catalog');
 const { format: formatPrice, parse: parsePrice } = require('../public/js/gold-rules');
 const { priceList, savePrice } = require('../services/shop');
-const groupQr = require('../services/groupQr');
 const router = express.Router();
 
 const cookie = 'salt_backup_admin';
@@ -21,20 +19,14 @@ let backingUp = false;
 let changingPassword = false;
 let loginsInFlight = 0;
 
-const uploadQr = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: groupQr.MAX_IMAGE_BYTES, files: 1 }
-});
-
-function page(req, res, status, view, session, messageKey = '', qr = null) {
+function page(req, res, status, view, session, messageKey = '') {
   return res.status(status).render('admin', {
     view,
     csrf: session?.csrf || '',
     firstLogin: !!session?.firstLogin,
     message: messageKey ? req.t(messageKey) : '',
-    qr: qr || groupQr.info(),
     returnTo: view === 'signs' ? '/admin/signs' : view === 'moderation' ? '/admin/moderation'
-      : view === 'qr' ? '/admin/qr' : '/admin'
+      : '/admin'
   });
 }
 
@@ -211,39 +203,6 @@ router.post('/moderation/revoke/:id', requireSession, async (req, res, next) => 
   }
 });
 
-const portContainerAds = require('../services/portContainerAds');
-router.get('/container-ads', (req, res, next) => {
-  if (!req.backupSession) return res.redirect(303, '/admin');
-  if (req.backupSession.firstLogin) return res.redirect(303, '/admin/password');
-  try {
-    const date = new Intl.DateTimeFormat(res.locals.lang === 'en-US' ? 'en-GB' : 'zh-CN', {
-      timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'short'
-    });
-    return res.render('admin', { view: 'container-ads', csrf: req.backupSession.csrf,
-      ads: portContainerAds.adminList(), formatTime: value => date.format(value),
-      message: '', returnTo: '/admin/container-ads' });
-  } catch (error) { next(error); }
-});
-
-router.post('/container-ads/:id/review', requireSession, (req, res, next) => {
-  if (req.backupSession.firstLogin) return res.redirect(303, '/admin/password');
-  const { action, purchase } = req.body;
-  if (action !== 'reject' && action !== 'approve') return res.status(400).end();
-  try {
-    portContainerAds.review(req.params.id, purchase, action === 'reject');
-    return res.redirect(303, '/admin/container-ads');
-  } catch (error) {
-    if (error.message === 'missing') return res.redirect(303, '/admin/container-ads');
-    next(error);
-  }
-});
-
-router.get('/container-ads/:id/:version.jpg', (req, res) => {
-  if (!req.backupSession || req.backupSession.firstLogin) return res.status(403).end();
-  const bytes = portContainerAds.image(req.params.id, req.params.version, true);
-  return bytes ? res.type('image/jpeg').send(bytes) : res.status(404).end();
-});
-
 function shopPage(req, res, status = 200, messageKey = '') {
   const prices = priceList();
   return res.status(status).render('admin', {
@@ -311,54 +270,6 @@ router.post('/tuning', requireSession, (req, res, next) => {
     require('../realtime/multiplayer').broadcastHoundFlip(saved.chance);
     return res.redirect(303, '/admin/tuning?result=saved');
   } catch (error) { next(error); }
-});
-
-router.get('/qr', (req, res) => {
-  const session = req.backupSession;
-  if (!session) return res.redirect(303, '/admin');
-  if (session.firstLogin) return res.redirect(303, '/admin/password');
-  return page(req, res, 200, 'qr', session);
-});
-
-function qrErrorKey(err) {
-  if (err && err.code === 'LIMIT_FILE_SIZE') return 'admin.qrTooLarge';
-  if (err && err.code === 'LIMIT_UNEXPECTED_FILE') return 'admin.qrMissingFile';
-  if (err && err.code === 'EMPTY') return 'admin.qrMissingFile';
-  if (err && err.code === 'SIZE') return 'admin.qrTooLarge';
-  if (err && err.code === 'TYPE') return 'admin.qrInvalidType';
-  return 'admin.qrUploadFailed';
-}
-
-router.post('/qr', (req, res, next) => {
-  const session = req.backupSession;
-  if (!session) return res.redirect(303, '/admin');
-  if (session.firstLogin) return res.redirect(303, '/admin/password');
-  uploadQr.single('image')(req, res, (uploadError) => {
-    if (uploadError) return page(req, res, 400, 'qr', session, qrErrorKey(uploadError));
-    checkCsrf(req, res, () => {
-      try {
-        const qr = groupQr.save({
-          buffer: req.file && req.file.buffer,
-          originalName: req.file && req.file.originalname
-        });
-        return page(req, res, 200, 'qr', session, 'admin.qrUploaded', qr);
-      } catch (error) {
-        if (!error.code) console.error('[group-qr]', error.message);
-        return page(req, res, error.code ? 400 : 500, 'qr', session, qrErrorKey(error));
-      }
-    });
-  });
-});
-
-router.post('/qr/reset', requireSession, (req, res) => {
-  if (req.backupSession.firstLogin) return res.redirect(303, '/admin/password');
-  try {
-    const qr = groupQr.reset();
-    return page(req, res, 200, 'qr', req.backupSession, 'admin.qrResetDone', qr);
-  } catch (error) {
-    console.error('[group-qr] reset:', error.message);
-    return page(req, res, 500, 'qr', req.backupSession, 'admin.qrUploadFailed');
-  }
 });
 
 router.post('/backup', requireSession, async (req, res) => {
