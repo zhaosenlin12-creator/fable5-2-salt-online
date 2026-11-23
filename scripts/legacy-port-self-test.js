@@ -82,11 +82,16 @@ assert.match(gameCss, /\.h-ammo\.infinite \.h-ammo-r::after/, '无限弹药 HUD 
 assert.match(server, /playerAuthority\.clampDronePosition/, '服务端必须强制无人机空气墙');
 assert.match(server, /playerAuthority\.consumeShot/, '服务端必须校验老版本弹夹与换弹');
 assert.match(server, /playerAuthority\.takeReportedShot/, '服务端必须限制老版本命中包刷伤害');
-assert.match(client, /tulingai\.com\/app-market\.html\?id=49/, '标题页必须提供安卓应用市场入口');
-assert.match(client, /createMarketLink\('title'\)/, '标题页必须挂载安卓应用市场入口');
-assert.match(client, /createMarketLink\('paused'\)/, '暂停菜单必须挂载安卓应用市场入口');
-assert.equal(zh.mp.appMarket, '安卓应用市场', '中文应用市场入口文案必须存在');
-assert.equal(en.mp.appMarket, 'Android app market', '英文应用市场入口文案必须存在');
+assert.doesNotMatch(client, /tulingai\.com|app-market\.html/, '客户端不得再挂载任何第三方平台推广入口');
+assert.doesNotMatch(
+  client,
+  /createMarketLink|createRepoLink|decorateRepoLinks/,
+  '标题页 / 暂停菜单 / 战场名单不得再挂载应用市场或仓库推广链接'
+);
+assert.equal(zh.mp.appMarket, undefined, '中文语言包不得保留应用市场推广文案');
+assert.equal(en.mp.appMarket, undefined, '英文语言包不得保留应用市场推广文案');
+assert.equal(zh.mp.hostEntry, undefined, '中文语言包不得保留招募类推广文案');
+assert.equal(en.mp.hostEntry, undefined, '英文语言包不得保留招募类推广文案');
 assert.match(mobileCss, /Compact phone type pass/, '手机端必须有紧凑字号规则');
 assert.match(mobileCss, /\.m-word \{ font-size: clamp\(34px, 12\.8vw, 86px\)/, '手机端主标题必须缩小');
 const compactMarker = mobileCss.lastIndexOf('/*', mobileCss.indexOf('Compact phone type pass'));
@@ -122,7 +127,6 @@ console.log(JSON.stringify({
   portableFeatures: [
     'kill-streak',
     'local-replay',
-    'android-market',
     'flight-collision',
     'server-authority',
     'infinite-ammo-no-reload',

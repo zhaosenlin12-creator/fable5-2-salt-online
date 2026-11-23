@@ -31,8 +31,6 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
 
 // 源码安全默认：只允许同源页面 iframe 嵌入。
-// 突灵AI自己的“临时托管预览”不会依赖这段源码放行，
-// 平台会在 source.zip 生成之后，仅对临时 Node 进程注入运行时兼容层。
 app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');

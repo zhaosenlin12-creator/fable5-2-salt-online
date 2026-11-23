@@ -90,51 +90,6 @@ html[lang="en-US"] .menu[data-screen="title"] .m-word {
   background: #ffc465;
   color: #111211;
 }
-.home-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 13px;
-  margin-top: clamp(10px, 2vh, 25px);
-}
-.menu[data-screen="title"] .home-links :is(.mp-title-repo, .community-mount--title) { display: contents; }
-.menu[data-screen="title"] .home-links :is(.salt-repo, .community-launch) {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  width: auto;
-  min-width: 0;
-  min-height: 40px;
-  margin: 0;
-  padding: 0 8px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  text-align: left;
-  color: #f1e7d3;
-}
-.menu[data-screen="title"] .home-links .salt-market { order: -2; }
-.menu[data-screen="title"] .home-links .community-launch { order: -1; }
-.menu[data-screen="title"] .home-links :is(.community-launch,.salt-market) { border-inline-end: 1px solid #e0d3be63; padding-inline-end: 14px; }
-.home-links :is(.salt-repo-copy, .community-launch-copy) b {
-  color: inherit;
-  font: italic 800 clamp(14px, 1.4vw, 22px)/1.2 var(--home-display) !important;
-  letter-spacing: .025em;
-  white-space: nowrap;
-}
-.home-links :is(.salt-repo-copy em, .community-launch-copy em, .salt-repo-arrow,
-  .community-launch-arrow, .community-launch-thumb) { display: none; }
-.home-links .salt-repo-glyph { display: grid; width: 23px; height: 23px; color: currentColor; }
-.home-links .community-launch::before {
-  content: "";
-  width: 23px;
-  height: 20px;
-  background: radial-gradient(circle at 20% 27%, currentColor 2.8px, transparent 3.4px),
-    radial-gradient(circle at 67% 25%, currentColor 3px, transparent 3.6px),
-    radial-gradient(ellipse at 20% 100%, currentColor 5px, transparent 5.6px),
-    radial-gradient(ellipse at 68% 100%, currentColor 6px, transparent 6.6px);
-}
-.menu[data-screen="title"] .home-links :is(.salt-repo, .community-launch):hover { color: #ffb642; }
 
 .m-deployment, .spawn-picker { min-width: 0; }
 .spawn-picker { margin: 0; padding: 0; border: 0; }

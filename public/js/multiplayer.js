@@ -27,107 +27,14 @@
   const STORAGE_SOLDIER = 'saltline.multiplayer.soldier';
   const UNIT_KINDS = ['male', 'female', 'hound', 'drone', 'classic'];
   const CALLSIGNS = ['RAVEN', 'VIPER', 'KESTREL', 'TALON', 'DRIFT', 'CINDER', 'ASH', 'MOSS'];
-  const HOST_ENTRY_URL = 'https://tulingai.com/index.html?conversationShareId=convshare-cb4af925336449159793e54a77ce8ca4';
-  const REPO_URL = 'https://github.com/wenzhengshi/fable5-2-salt-online';
-  const ANDROID_MARKET_URL = 'https://tulingai.com/app-market.html?id=49';
   const GOLD_ACTIVITY_LIMIT = 8;
   const GOLD_ACTIVITY_REFRESH_MS = 15000;
-  const REPO_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>';
-  const MARKET_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 3h2v9.17l3.59-3.58L18 10l-6 6-6-6 1.41-1.41L11 12.17V3Zm-6 15h14v3H5v-3Z"/></svg>';
-
   function t(key, vars) {
     const raw = MP[key];
     if (typeof raw !== 'string') return key;
     return raw.replace(/\{(\w+)\}/g, (match, name) => (
       vars && Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match
     ));
-  }
-
-  function createRepoLink(variant, isHost = false) {
-    const href = isHost ? HOST_ENTRY_URL : REPO_URL;
-    const link = document.createElement('a');
-    link.className = 'salt-repo' + (variant ? ' salt-repo-' + variant : '');
-    link.href = href;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    const title = isHost ? t('hostEntry') : variant === 'title' ? 'GitHub' : t('repo');
-    const hint = t(isHost ? 'hostEntryHint' : 'repoHint');
-    link.title = hint;
-    link.setAttribute('aria-label', title + ' — ' + hint);
-
-    const glyph = document.createElement('span');
-    glyph.className = 'salt-repo-glyph';
-    if (isHost) glyph.textContent = '↗';
-    else glyph.innerHTML = REPO_ICON;
-    glyph.setAttribute('aria-hidden', 'true');
-
-    const copy = document.createElement('span');
-    copy.className = 'salt-repo-copy';
-    const label = document.createElement('b');
-    label.textContent = title;
-    const url = document.createElement('em');
-    url.textContent = href;
-    url.dir = 'ltr';
-    copy.append(label, url);
-
-    const arrow = document.createElement('span');
-    arrow.className = 'salt-repo-arrow';
-    arrow.setAttribute('aria-hidden', 'true');
-    arrow.textContent = '↗';
-
-    link.append(glyph, copy, arrow);
-    return link;
-  }
-
-  function createMarketLink(variant) {
-    const link = document.createElement('a');
-    link.className = 'salt-repo salt-market' + (variant ? ' salt-repo-' + variant : '');
-    link.href = ANDROID_MARKET_URL;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.title = t('appMarketHint');
-    link.setAttribute('data-mp-market', variant || 'default');
-    link.setAttribute('aria-label', t('appMarket') + ' — ' + t('appMarketHint') + ': ' + ANDROID_MARKET_URL);
-
-    const glyph = document.createElement('span');
-    glyph.className = 'salt-repo-glyph';
-    glyph.innerHTML = MARKET_ICON;
-
-    const copy = document.createElement('span');
-    copy.className = 'salt-repo-copy';
-    const label = document.createElement('b');
-    label.textContent = variant === 'title' ? window.__SALT_I18N__.messages.deployment.android : t('appMarket');
-    const meta = document.createElement('em');
-    meta.textContent = t('appMarketMeta');
-    copy.append(label, meta);
-
-    const arrow = document.createElement('span');
-    arrow.className = 'salt-repo-arrow';
-    arrow.setAttribute('aria-hidden', 'true');
-    arrow.textContent = '↗';
-
-    link.append(glyph, copy, arrow);
-    return link;
-  }
-
-  function decorateRepoLinks() {
-    const titleMain = document.querySelector('.m-screen[data-s="title"] .m-title-main');
-    if (titleMain && !titleMain.querySelector('[data-mp-repo="title"]')) {
-      const mount = document.createElement('div');
-      mount.className = 'mp-title-repo';
-      mount.setAttribute('data-mp-repo', 'title');
-      mount.append(createMarketLink('title'), createRepoLink('title', true), createRepoLink('title'));
-      (titleMain.querySelector('.home-links') || titleMain).appendChild(mount);
-    }
-
-    const paused = document.querySelector('.m-screen[data-s="paused"]');
-    if (paused && !paused.querySelector('[data-mp-repo="paused"]')) {
-      const mount = document.createElement('div');
-      mount.className = 'mp-paused-repo';
-      mount.setAttribute('data-mp-repo', 'paused');
-      mount.append(createRepoLink('paused'), createMarketLink('paused'));
-      paused.appendChild(mount);
-    }
   }
 
   function randomName() {
@@ -403,7 +310,6 @@
             </div>
           </div>
         </div>
-        <div class="mp-roster-repo" id="mp-roster-repo"></div>
         <p class="mp-roster-hint" data-mp-label="rosterHint"></p>
       </div>
     </div>
@@ -465,7 +371,6 @@
     goldPickupList: ui.querySelector('#mp-gold-pickup-list'),
     goldActivityScroll: ui.querySelector('#mp-gold-activity-scroll'),
     goldActivitySentinel: ui.querySelector('#mp-gold-activity-sentinel'),
-    rosterRepo: ui.querySelector('#mp-roster-repo'),
     toast: ui.querySelector('#mp-toast'),
     rosterClose: ui.querySelector('#mp-roster-close')
   };
@@ -512,8 +417,6 @@
   el.rosterClose.setAttribute('aria-label', t('close'));
   el.nameInput.value = myName;
   el.nameSave.textContent = t('save');
-  el.rosterRepo.appendChild(createRepoLink('compact'));
-
   let toastTimer = 0;
   let lastBlockedToast = 0;
   function toast(text) {
@@ -644,12 +547,10 @@
   const titlePoll = window.setInterval(() => {
     titleTries += 1;
     decorateTitle();
-    decorateRepoLinks();
-    const found = !!document.querySelector('[data-mp-title]') && !!document.querySelector('[data-mp-repo="title"]');
+    const found = !!document.querySelector('[data-mp-title]');
     if ((found && titleTries > 2) || titleTries > 40) window.clearInterval(titlePoll);
   }, 1000);
   decorateTitle();
-  decorateRepoLinks();
 
   /* ------------------------------------------------------------- kill feed */
 

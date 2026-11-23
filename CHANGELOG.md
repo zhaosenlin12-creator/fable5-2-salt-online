@@ -1,5 +1,13 @@
 # 变更日志
 
+## v1.37.0 — 2026-11-24
+
+- 移除标题页 / 暂停菜单 / 战场名单里的全部外链推广入口：安卓应用市场（`tulingai.com/app-market.html`）、「自由改造 · 当腐竹」招募页，以及指向原作者仓库的 GitHub 链接；客户端不再向游戏界面注入任何第三方站点链接。
+- 清理随之失效的文案与样式：`locales/zh-CN.json` 与 `locales/en-US.json` 删除 `mp.repo` / `mp.repoHint` / `mp.hostEntry` / `mp.hostEntryHint` / `mp.appMarket` / `mp.appMarketMeta` / `mp.appMarketHint` 与 `deployment.android`；`public/js/multiplayer.js` 删除 `createRepoLink` / `createMarketLink` / `decorateRepoLinks` 与名单里的仓库入口，`public/css/style.css`、`public/css/deployment.css` 清掉 `.salt-repo*`、`.mp-title-repo`、`.mp-paused-repo`、`.mp-roster-repo`、`.home-links` 等死样式，标题页的空容器一并移除。
+- 仓库元数据改为指向自己的仓库：`package.json` 的 `repository.url` 与 `homepage` 更新为 `zhaosenlin12-creator/fable5-2-salt-online`。
+- 回归自测加固：`scripts/legacy-port-self-test.js` 反向断言客户端不得再出现 `tulingai.com` / 应用市场 / 仓库推广入口，语言包不得再保留相关文案。
+- 玩法零改动：赛车、小队 AI 队友、好友跟随、语音、回放、商店、路牌与皮肤、前沿战场全部保留。
+
 ## v1.36.0 — 2026-11-24
 
 - 移除「工作时间段」不可游玩限制：删除首页阻断弹窗（倒计时卡片）、`/api/game/play-schedule` 接口与服务端 `scheduleBlocked` 入场拦截，不再按北京时间工作时段或节假日封锁游戏，任何时间都能直接部署进入对局。

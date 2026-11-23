@@ -6056,7 +6056,6 @@ let C=m.goal;if(m.path){for(;m.wp<m.path.length-1&&Math.hypot(m.path[m.wp].x-m.p
           <button class="btn" data-act="settings">设置</button>
           <button class="btn" data-act="controls">操作说明</button>
         </div>
-        <div class="home-links"></div>
       </div>
       <p class="home-connection" data-mp-title aria-live="polite"></p>
     </section>
