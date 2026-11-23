@@ -54,21 +54,31 @@ function createSquad({ players, mapKey, fire, damageTarget, targets, heal, notif
     return cache.get(map);
   }
 
-  function spawn(squad, role, owner, now) {
-    const spec = ROLES[role];
+  // 编队站位：以队长朝向为基准的固定偏移。
+  function formation(owner, spec) {
     const yaw = owner.yaw || 0;
     const cos = Math.cos(yaw);
     const sin = Math.sin(yaw);
+    return {
+      x: owner.pos.x + cos * spec.right + sin * spec.forward,
+      y: owner.pos.y,
+      z: owner.pos.z - sin * spec.right + cos * spec.forward
+    };
+  }
+
+  function spawn(squad, role, owner, now) {
+    const spec = ROLES[role];
+    const spot = formation(owner, spec);
     const member = {
       id: randomUUID(),
       role,
       label: spec.label,
       hp: spec.hp,
       maxHp: spec.hp,
-      x: owner.pos.x + cos * spec.right + sin * spec.forward,
-      y: owner.pos.y,
-      z: owner.pos.z - sin * spec.right + cos * spec.forward,
-      yaw,
+      x: spot.x,
+      y: spot.y,
+      z: spot.z,
+      yaw: owner.yaw || 0,
       state: 'active',
       fireAt: now + 900,
       downAt: 0,
@@ -82,6 +92,15 @@ function createSquad({ players, mapKey, fire, damageTarget, targets, heal, notif
 
   function memberOf(squad, role) {
     return squad.members.find(member => member.role === role) || null;
+  }
+
+  // 按 id 找到队友：巡逻怪结算伤害、队长发起扶起都要用。
+  function findMember(id) {
+    for (const [ownerId, squad] of squads) {
+      const member = squad.members.find(item => item.id === id);
+      if (member) return { ownerId, squad, member, owner: squad.owner };
+    }
+    return null;
   }
 
   function surface(map, x, z, referenceY) {
@@ -193,14 +212,7 @@ function createSquad({ players, mapKey, fire, damageTarget, targets, heal, notif
       const range = Math.hypot(target.x - member.x, target.z - member.z);
       return range <= spec.range && range >= 1.2;
     });
-    const yaw = owner.yaw || 0;
-    const cos = Math.cos(yaw);
-    const sin = Math.sin(yaw);
-    const follow = {
-      x: owner.pos.x + cos * spec.right + sin * spec.forward,
-      y: owner.pos.y,
-      z: owner.pos.z - sin * spec.right + cos * spec.forward
-    };
+    const follow = formation(owner, spec);
     if (!engaged || distance(member, follow) > 14) move(member, map, follow, owner, squad.dt);
     if (engaged) {
       member.y = surface(map, member.x, member.z, owner.pos.y);
@@ -210,7 +222,18 @@ function createSquad({ players, mapKey, fire, damageTarget, targets, heal, notif
 
   function updateSquad(squad, owner, now) {
     const map = mapKey(owner);
-    squad.map = map;
+    if (squad.map !== map) {
+      // 队长换图（港口 → 青云宗 → 远征图）：队友必须跟着传送，
+      // 否则会留在旧地图的坐标里卡在墙里，永远打不到也倒不了。
+      squad.map = map;
+      for (const member of squad.members) {
+        const spot = formation(owner, member.spec);
+        member.x = spot.x;
+        member.z = spot.z;
+        member.y = surface(map, member.x, member.z, owner.pos.y);
+        member.yaw = owner.yaw || 0;
+      }
+    }
     const list = hostiles(map);
     // 每个角色各自计时：开局三人同时到场，阵亡后单独补员。
     for (const role of ORDER) {
@@ -233,7 +256,7 @@ function createSquad({ players, mapKey, fire, damageTarget, targets, heal, notif
       live.add(player.id);
       let squad = squads.get(player.id);
       if (!squad) {
-        squad = { owner: player.id, members: [], nextJoinAt: {}, dt: dt || .1 };
+        squad = { owner: player, members: [], nextJoinAt: {}, dt: dt || .1 };
         squads.set(player.id, squad);
       }
       squad.dt = dt || .1;
@@ -254,26 +277,41 @@ function createSquad({ players, mapKey, fire, damageTarget, targets, heal, notif
     return true;
   }
 
-  function hurt(player, amount, now, origin) {
-    const squad = squads.get(player.id);
-    if (!squad) return;
-    let best = null;
-    let bestScore = Infinity;
-    for (const member of squad.members) {
-      if (member.state !== 'active') continue;
-      const score = origin ? distance(origin, member) : 0;
-      if (score >= bestScore) continue;
-      best = member;
-      bestScore = score;
+  // 队友被巡逻怪命中：血量归零后倒地，等待队长（E 键）或医疗兵扶起。
+  // 队长自己的血量不再由队友代扣，否则队长阵亡前队友永远打不倒。
+  function damageMember(id, amount, now, origin) {
+    const found = findMember(id);
+    if (!found) return false;
+    const member = found.member;
+    if (member.state !== 'active') return false;
+    member.hp = Math.max(0, member.hp - amount);
+    if (member.hp > 0) return true;
+    member.state = 'downed';
+    member.downAt = now;
+    member.bleedAt = now + BLEED_MS;
+    member.reviving = null;
+    notify?.('downed', member, found.owner, { origin: origin || null });
+    return true;
+  }
+
+  // 供共享巡逻怪瞄准：只有活动状态的队友才是有效目标，倒地后不再挨打。
+  function exposed(map) {
+    const rows = [];
+    for (const [ownerId, squad] of squads) {
+      if (map && squad.map !== map) continue;
+      for (const member of squad.members) {
+        if (member.state !== 'active') continue;
+        rows.push({
+          id: member.id,
+          owner: ownerId,
+          role: member.role,
+          x: member.x,
+          y: member.y,
+          z: member.z
+        });
+      }
     }
-    if (!best) return;
-    best.hp = Math.max(0, best.hp - amount);
-    if (best.hp > 0) return;
-    best.state = 'downed';
-    best.downAt = now;
-    best.bleedAt = now + BLEED_MS;
-    best.reviving = null;
-    notify?.('downed', best, player);
+    return rows;
   }
 
   function snapshot(map) {
@@ -302,7 +340,7 @@ function createSquad({ players, mapKey, fire, damageTarget, targets, heal, notif
     return rows;
   }
 
-  return { tick, revive, hurt, snapshot, squads };
+  return { tick, revive, damageMember, exposed, snapshot, squads };
 }
 
 module.exports = { createSquad, ROLES };

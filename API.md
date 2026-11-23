@@ -402,8 +402,8 @@
 | `mapEnter` | `map` | 从青云宗枢纽进入传送门地图；`map` 为 `bayhaven`、`dustfall`、`mothlight`、`lunar`、`resort` 或 `lumbermill`。仅允许存活、未上船、当前位于青云宗且靠近对应枢纽门的玩家发送 |
 | `mapReturn` | 无 | 从传送门地图返回青云宗；仅允许存活玩家在对应回程门附近发送 |
 | `mapLeave` | 无 | 部署或重连流程用于清理地图状态，并把玩家放回其出生点；不要求位于回程门附近 |
-| `squadMode` | `enabled` | 开关自己的 AI 小队队友（突击 / 狙击 / 医疗）。服务端按角色维护编制，队友会跟随队长并对巡逻怪开火；断线重连后需重新发送 | 
-| `squadRevive` | `id` | 请求扶起指定的小队成员；必须在 3.4 米内且该成员确实处于倒地状态，服务端计时 2.6 秒完成扶起，中途离开范围会中断 |
+| `squadMode` | `enabled` | 开关自己的 AI 小队队友（突击 / 狙击 / 医疗）。服务端按角色维护编制，队友会跟随队长并对巡逻怪开火；队长换图时队友会跟着传送；断线重连后需重新发送 | 
+| `squadRevive` | `id` | 请求扶起指定的小队成员；必须在 3.4 米内且该成员确实处于倒地状态，服务端计时 2.6 秒完成扶起，中途离开范围会中断。队友的血量独立结算，会被机器单位单独命中打倒 |
 | `godMode` | `enabled` | 中文魔改的无敌开关；只有服务端以 `SALT_MOD=1` 启动时才会真正生效，公网部署默认关闭并忽略该请求 |
 | `spawnMap` | `map` | 从游戏内传送流程请求指定出生地图；`map` 为 `port`、`qingyun` 或远征地图 ID。结果通过 `spawnMapResult` 返回，专注期间同样会被拒绝 |
 | `signList` | 无 | 请求当前地图 52 米内的路牌；同一连接 600 ms 内重复请求会被忽略 |
@@ -453,7 +453,7 @@
 | `nameDenied` | `reason` | `filtered`（敏感词）或 `invalid`（空代号）；改代号失败时原代号不变 |
 | `anonymousState` | `ok`, `enabled`, `reason` | 匿名在线切换结果；成功时 `ok: true` 并返回最新 `enabled`；失败时 `reason` 为 `notReady`（尚未入场）或 `rate`（700 ms 内重复切换） |
 | `pose` | `t`, `players[]` | 20 Hz 轻量移动帧；`players[]` 每项含 `id,x,y,z,yaw,moving,sprint,swimming`，仅用于同地图远端角色位置、朝向和动作插值。完整血量、装备、载具、名单与地图实体仍由 10 Hz `snapshot` 同步 |
-| `snapshot` | `t`, `online`, `onlineOthers`, `players[]`, `roster[]`, `voice[]`, `boat`, `sedan`, `squads[]`, `mods`, `you` | 10 Hz 完整状态帧；`online` 为有效在线连接总数，`onlineOthers` 为排除自己后的在线数（仅自己时为 `0`，HUD 显示「无人在线」）；`players[]` 每项含 `x,y,z,yaw,pitch,hp,moving,sprint,shield,soldier,carSeat,carId`，`roster[]` 每项含 `soldier`、`focused`、`focusUntil`、`focusKind`、`anonymous`、`nameHidden` 与 `focus{active,until,remainingMs,kind,durationMs,trigger}`，匿名玩家对其他接收者下发空代号且 `nameHidden: true`，自己仍可看到本行真实代号；`voice[]` 只包含已开麦玩家，`boat` 为共享撤离船状态，`sedan` 为当前地图的共享轿车状态（含唯一 `id`、四个座位与当前玩家座位），跨地图玩家为 `null`；`squads[]` 为当前地图的 AI 小队成员，含 `id`、`owner`、`role`、`label`、`hp`、`maxHp`、`x,y,z`、`yaw`、`state`（`active` / `downed`）与 `reviving`；`mods.god` 表示服务端是否开放中文魔改的无敌开关；`you` 含 `active`、`anonymous`、`focusUntil`、`focusKind`、`focusDurationMs` 与 `follow{following,followers[],friends[],requests[]}`，其中 `following` 含目标公开信息与实时 `anchor{x,y,z,yaw}`；`anchor.y` 跟随目标当前海拔，客户端还会按地图地形做贴地校正 |
+| `snapshot` | `t`, `online`, `onlineOthers`, `players[]`, `roster[]`, `voice[]`, `boat`, `sedan`, `squads[]`, `mods`, `you` | 10 Hz 完整状态帧；`online` 为有效在线连接总数，`onlineOthers` 为排除自己后的在线数（仅自己时为 `0`，HUD 显示「无人在线」）；`players[]` 每项含 `x,y,z,yaw,pitch,hp,moving,sprint,shield,soldier,carSeat,carId`，`roster[]` 每项含 `soldier`、`focused`、`focusUntil`、`focusKind`、`anonymous`、`nameHidden` 与 `focus{active,until,remainingMs,kind,durationMs,trigger}`，匿名玩家对其他接收者下发空代号且 `nameHidden: true`，自己仍可看到本行真实代号；`voice[]` 只包含已开麦玩家，`boat` 为共享撤离船状态，`sedan` 为当前地图的共享轿车状态（含唯一 `id`、四个座位与当前玩家座位），跨地图玩家为 `null`；`squads[]` 为当前地图的 AI 小队成员，含 `id`、`owner`、`role`、`label`、`hp`、`maxHp`、`x,y,z`、`yaw`、`state`（`active` / `downed`）与 `reviving`；队友血量由机器单位的攻击直接扣减，倒地时通过 `squadNotice` 的 `kind: "downed"` 通知队长；`mods.god` 表示服务端是否开放中文魔改的无敌开关；`you` 含 `active`、`anonymous`、`focusUntil`、`focusKind`、`focusDurationMs` 与 `follow{following,followers[],friends[],requests[]}`，其中 `following` 含目标公开信息与实时 `anchor{x,y,z,yaw}`；`anchor.y` 跟随目标当前海拔，客户端还会按地图地形做贴地校正 |
 | `followInviteSent` | `target{id,name,color,soldier}`, `expiresAt` | 好友请求已送达目标；重复发送未过期请求时也会返回 |
 | `followInviteReceived` | `from{id,name,color,soldier}`, `at`, `expiresAt` | 收到好友请求，客户端展示接受 / 拒绝卡片 |
 | `followInviteResult` | `accepted`, `target` 或 `from`, `autoFollow`, `reason` | 请求方收到接受结果；`autoFollow: true` 表示已开始自动跟随。拒绝、过期或目标不可用时 `accepted: false` 并带 `reason` |

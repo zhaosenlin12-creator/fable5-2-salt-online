@@ -1062,7 +1062,6 @@ const portalBosses = createPortalBosses({
     send(target.ws, { type: 'damaged', amount: damage, hp: target.hp, bossDamage: true, from: {
       ...cause, pos: { x: origin.x, y: origin.y, z: origin.z }
     } });
-    squad.hurt(target, damage, now, origin);
     if (target.hp <= 0) killPlayer(target, null, now, cause);
   }
 });
@@ -1071,6 +1070,11 @@ const sharedPatrols = require('../services/sharedPatrols').createSharedPatrols({
   players: () => players.values(), mapKey: mapKeyOf,
   eligible: (player, now) => player.joined && player.active && player.alive &&
     player.focusUntil <= now && !frontier.dropping(player, now),
+  // 小队队友也在机器单位的射程内：队友挨打才会倒地，队长才能去扶。
+  extraTargets: (map) => squad.exposed(map),
+  damageExtra(target, unit, amount, now, origin) {
+    squad.damageMember(target.id, amount, now, origin);
+  },
   fire(unit, origin, dir, range) {
     broadcast({type:'shot',id:unit.id,bossKind:unit.kind,map:unit.map,origin,dir,range},
       player => player.joined && mapKeyOf(player) === unit.map);
@@ -1081,7 +1085,6 @@ const sharedPatrols = require('../services/sharedPatrols').createSharedPatrols({
     target.hp = Math.max(0,target.hp-damage);
     const cause={id:unit.id,name:unit.kind==='hound'?'机器狗':'无人机',color:'#ff6f44',soldier:unit.kind==='hound'?'hound':'drone'};
     send(target.ws,{type:'damaged',amount:damage,hp:target.hp,bossDamage:true,from:{...cause,pos:origin}});
-    squad.hurt(target,damage,now,origin);
     if(target.hp<=0)killPlayer(target,null,now,cause);
   },
   destroy(player, unit, floor, now) {
@@ -1131,9 +1134,9 @@ const squad = createSquad({
     if (!owner || !owner.alive) return;
     owner.hp = Math.min(MAX_HP, owner.hp + amount);
   },
-  notify(kind, member, owner) {
+  notify(kind, member, owner, extra) {
     if (!owner || !owner.ws || owner.ws.readyState !== 1) return;
-    send(owner.ws, { type: 'squadNotice', kind, id: member.id, role: member.role, label: member.label });
+    send(owner.ws, { type: 'squadNotice', kind, id: member.id, role: member.role, label: member.label, ...(extra || {}) });
   }
 });
 

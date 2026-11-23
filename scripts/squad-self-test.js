@@ -65,10 +65,22 @@ assert.ok(shots.length > 0, '小队应对附近敌人开火');
 assert.ok(damaged.length > 0, '小队开火应对巡逻怪造成伤害');
 
 // 受伤倒地。
-squad.hurt(player, 9999, now, { x: player.pos.x, y: 0, z: player.pos.z });
+const assault = squad.snapshot('port').find(row => row.role === 'assault');
+assert.equal(
+  squad.damageMember(assault.id, 9999, now, { x: player.pos.x, y: 0, z: player.pos.z }),
+  true,
+  '巡逻怪命中队友应结算伤害'
+);
 const downed = squad.snapshot('port').find(row => row.state === 'downed');
 assert.ok(downed, '队友应会倒地');
 assert.ok(notices.some(item => item.kind === 'downed'), '倒地应通知队长');
+
+// 队长自己挨打不再由队友代扣血：队友的血量是独立的。
+const sniper = squad.snapshot('port').find(row => row.role === 'sniper');
+const before = sniper.hp;
+player.hp = 60;
+assert.equal(squad.damageMember(sniper.id, 0, now, null), true, '零伤害不应改变状态');
+assert.equal(squad.snapshot('port').find(row => row.role === 'sniper').hp, before, '队友血量不应被队长受击牵连');
 
 // 队长扶起：距离太远时应拒绝。
 assert.equal(squad.revive(player, downed.id, now), false, '超范围不应允许扶起');

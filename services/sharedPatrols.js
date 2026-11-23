@@ -6,6 +6,8 @@ const qingyun = require('../public/js/qingyun-zone');
 const { ground, blocked, houndPathClear } = require('./portalBosses');
 
 const kinds={hound:{hp:140,speed:2.6,radius:.92,air:0,damage:7},gull:{hp:45,speed:4,radius:.78,air:5,damage:5},drone:{hp:96,speed:5.4,radius:.66,air:4.2,damage:6}};
+// 队友比队长更靠前交火，机器单位选目标时给队友一点点优先权。
+const EXTRA_TARGET_BIAS=4;
 // 新增地图额外投放空中无人机，与机器狗组成该图的守军。
 const mapKinds=map=>map==='resort'||map==='lumbermill'?['hound','gull','drone']:['hound','gull'];
 const anchors={qingyun:{x:0,y:2,z:qingyun.offsetZ+9},...Object.fromEntries(Object.values(maps).map(map=>[map.id,map.landing]))};
@@ -20,7 +22,7 @@ function rayHit(origin,dir,point,radius,range){
   const hit=Math.max(0,along-Math.sqrt(radius*radius-side));
   return hit<range?hit:null;
 }
-function createSharedPatrols({players,mapKey,fire,damage,destroy,eligible}){
+function createSharedPatrols({players,mapKey,fire,damage,destroy,eligible,extraTargets,damageExtra}){
   const zones=new Map(Object.entries(anchors).map(([map,anchor])=>[map,mapKinds(map).map((kind,i)=>({kind,anchor,i,due:0,round:0,unit:null}))]));
   let lastTick;
   const current=new Map();
@@ -67,16 +69,29 @@ function createSharedPatrols({players,mapKey,fire,damage,destroy,eligible}){
       if(unit.moving)Object.assign(unit,next,{yaw});
       if(now<unit.fireAt)continue;
       const origin=body(unit);
-      const victim=nearby.filter(p=>p.protectedUntil<=now&&distance(origin,p.pos)<26)
-        .sort((a,b)=>distance(origin,a.pos)-distance(origin,b.pos))
-        .find(p=>!blocked(map,origin,{...p.pos,y:p.pos.y+.9}));
+      // 目标候选：玩家 + 小队队友。队友在前面交火，机器单位会优先咬他们。
+      const candidates=[];
+      for(const p of nearby){
+        if(p.protectedUntil>now)continue;
+        const d=distance(origin,p.pos);
+        if(d>=26)continue;
+        candidates.push({kind:'player',d,pos:p.pos,ref:p});
+      }
+      for(const e of extraTargets?extraTargets(map):[]){
+        const d=distance(origin,e);
+        if(d>=26)continue;
+        candidates.push({kind:'extra',d:d-EXTRA_TARGET_BIAS,pos:{x:e.x,y:e.y,z:e.z},ref:e});
+      }
+      candidates.sort((a,b)=>a.d-b.d);
+      const victim=candidates.find(c=>!blocked(map,origin,{x:c.pos.x,y:c.pos.y+.9,z:c.pos.z}));
       if(!victim)continue;
-      const end={...victim.pos,y:victim.pos.y+.9},range=distance(origin,end);
+      const end={x:victim.pos.x,y:victim.pos.y+.9,z:victim.pos.z},range=distance(origin,end);
       if(range<.1)continue;
       const dir={x:(end.x-origin.x)/range,y:(end.y-origin.y)/range,z:(end.z-origin.z)/range};
       unit.fireAt=now+1900;
       fire(unit,origin,dir,range);
-      damage(victim,unit,stats.damage,now,origin);
+      if(victim.kind==='extra')damageExtra?damageExtra(victim.ref,unit,stats.damage,now,origin):0;
+      else damage(victim.ref,unit,stats.damage,now,origin);
     }
   }
   function intersect(player,origin,dir,range,now){
