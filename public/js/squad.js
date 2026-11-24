@@ -12,7 +12,17 @@
     sniper: 'squad.sniper',
     medic: 'squad.medic'
   };
+  // 队友直接复用玩家那套骨骼士兵模型（hunter / female-soldier），
+  // 只按兵种换配色，不再用一堆方块拼人。
+  const ROLE_PALETTES = {
+    assault: { jacket: '#2f7fd0', pants: '#22303f', trim: '#8fd8ff', boots: '#171c22' },
+    sniper: { jacket: '#c08a2e', pants: '#3a3226', trim: '#ffd166', boots: '#1e1b15' },
+    medic: { jacket: '#2f9a63', pants: '#1f3329', trim: '#9dffc4', boots: '#15201b' }
+  };
+  const ROLE_KINDS = { assault: 'male', sniper: 'male', medic: 'female' };
   const REVIVE_RANGE = 3.4;
+  const BODY_PIVOT = .92;   // 倒地时绕身体中心翻转，避免整个人绕脚后仰倒
+  const DOWNED_DROP = .77;  // 倒地后整体下沉，贴合地面
 
   function messages() {
     return (window.__SALT_I18N__ || {}).messages || {};
@@ -45,6 +55,43 @@
     } catch { /* ignore */ }
   }
 
+  // 材质分区：决定队友身上哪块用兵种主色。
+  function roleChannel(mesh, material) {
+    const name = String((material && material.name) || '').toLowerCase();
+    const meshName = String((mesh && mesh.name) || '').toLowerCase();
+    if (/skin|hair|brow|beard|eye|visor/.test(name)) return null;
+    if (/feet|boot/.test(meshName)) return 'boots';
+    if (/legs/.test(meshName)) return 'pants';
+    if (/grey|brown/.test(name)) return 'trim';
+    return 'jacket';
+  }
+
+  function applyRolePalette(model, palette) {
+    if (!model || !model.traverse || !palette) return;
+    const cache = new Map();
+    model.traverse((mesh) => {
+      if (!mesh.isMesh || !mesh.material) return;
+      // 武器保持出厂配色，整把枪被染成兵种色太扎眼。
+      let weapon = false;
+      mesh.traverseAncestors(node => { if (node.userData && node.userData.soldierWeapon) weapon = true; });
+      if (weapon) return;
+      const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const next = list.map((material) => {
+        const channel = roleChannel(mesh, material);
+        if (!channel || !material.color) return material;
+        const key = material.uuid + ':' + channel;
+        if (!cache.has(key)) {
+          const copy = material.clone();
+          copy.color.set(palette[channel] || palette.jacket);
+          if (copy.emissive) copy.emissive.set(0x000000);
+          cache.set(key, copy);
+        }
+        return cache.get(key);
+      });
+      mesh.material = Array.isArray(mesh.material) ? next : next[0];
+    });
+  }
+
   window.installSquad = function (game) {
     const { THREE, scene } = game;
     const members = new Map();
@@ -52,7 +99,6 @@
     let map = '';
     let enabled = readEnabled();
     const pointer = new THREE.Vector3();
-    const up = new THREE.Vector3(0, 1, 0);
 
     const panel = document.createElement('div');
     panel.id = 'squad-panel';
@@ -67,6 +113,7 @@
       'font:600 13px/1.4 system-ui,sans-serif;pointer-events:none';
     document.body.append(prompt);
 
+    // 模型没加载出来之前的兜底造型，避免队友凭空消失。
     function body(color) {
       const group = new THREE.Group();
       const suit = new THREE.MeshStandardMaterial({ color, roughness: .72, metalness: .08 });
@@ -116,27 +163,107 @@
         new THREE.CylinderGeometry(.09, .09, 1.7, 8, 1, true),
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .55, depthWrite: false, toneMapped: false })
       );
-      mesh.position.y = 1.5;
+      mesh.position.y = 1.55;
       return mesh;
+    }
+
+    // 把真实骨骼士兵挂到队友身上。模型是异步加载的，失败就继续用方块兜底。
+    function mountSoldier(entry) {
+      if (entry.mounted || entry.pending || entry.failed || entry.disposed) return;
+      const api = window.HunterAvatar;
+      if (!api || typeof api.create !== 'function' || typeof api.whenReady !== 'function') return;
+      entry.pending = true;
+      const kind = entry.kind;
+      const attach = (ok) => {
+        entry.pending = false;
+        if (entry.disposed || entry.mounted) return;
+        if (!ok || !api.isReady(kind)) {
+          entry.failed = true;
+          return;
+        }
+        let avatar = null;
+        try {
+          avatar = api.create(kind, {});
+        } catch (err) {
+          console.warn('[squad] 士兵模型挂载失败，继续用兜底造型', err);
+          entry.failed = true;
+          return;
+        }
+        if (!avatar || !avatar.model) {
+          entry.failed = true;
+          return;
+        }
+        applyRolePalette(avatar.model, entry.palette);
+        avatar.model.name = 'squad-soldier-' + entry.row.id;
+        avatar.model.traverse(node => {
+          if (!node.isMesh) return;
+          node.castShadow = false;
+          node.receiveShadow = true;
+        });
+        entry.holder.add(avatar.model);
+        entry.model = avatar.model;
+        entry.rig = avatar.rig;
+        entry.mounted = true;
+        if (entry.fallback) {
+          entry.holder.remove(entry.fallback);
+          entry.fallback.traverse(node => { if (node.isMesh) node.geometry.dispose(); });
+          entry.fallback = null;
+        }
+      };
+      api.whenReady(kind).then(attach).catch(() => attach(false));
     }
 
     function create(row) {
       const color = ROLE_COLORS[row.role] || 0xffffff;
-      const model = body(color);
+      const root = new THREE.Group();
+      root.name = 'squad-' + row.id;
+      // tilt 绕身体中心翻转，holder 抵消位移，模型本身保持在脚底原点。
+      const tilt = new THREE.Group();
+      tilt.position.y = BODY_PIVOT;
+      const holder = new THREE.Group();
+      holder.position.y = -BODY_PIVOT;
+      const fallback = body(color);
+      holder.add(fallback);
+      tilt.add(holder);
+      root.add(tilt);
       const light = beacon(color);
-      model.add(light);
+      root.add(light);
       light.visible = false;
-      model.name = 'squad-' + row.id;
-      scene.add(model);
-      return { model, light, row };
+      scene.add(root);
+      const entry = {
+        root,
+        tilt,
+        holder,
+        fallback,
+        light,
+        model: null,
+        rig: null,
+        row,
+        kind: ROLE_KINDS[row.role] || 'male',
+        palette: ROLE_PALETTES[row.role] || ROLE_PALETTES.assault,
+        mounted: false,
+        pending: false,
+        failed: false,
+        disposed: false,
+        speed: 0
+      };
+      mountSoldier(entry);
+      return entry;
     }
 
     function dispose(entry) {
       if (!entry) return;
-      entry.model.removeFromParent();
-      entry.model.traverse(node => {
-        if (node.isMesh) node.geometry.dispose();
-      });
+      entry.disposed = true;
+      entry.root.removeFromParent();
+      if (entry.fallback) {
+        entry.fallback.traverse(node => { if (node.isMesh) node.geometry.dispose(); });
+        entry.fallback = null;
+      }
+      // 士兵模型是共享模板的克隆，geometry/material 归模板所有，不能在这里释放。
+      if (entry.light) {
+        entry.light.geometry.dispose();
+        if (entry.light.material) entry.light.material.dispose();
+      }
     }
 
     function clear() {
@@ -222,20 +349,28 @@
         if (!entry) {
           entry = create(row);
           members.set(row.id, entry);
-          entry.model.position.set(row.x, row.y, row.z);
+          entry.root.position.set(row.x, row.y, row.z);
         }
-        const model = entry.model;
+        if (!entry.mounted && !entry.failed) mountSoldier(entry);
+        const root = entry.root;
         const mix = 1 - Math.exp(-dt * 12);
-        model.position.x += (row.x - model.position.x) * mix;
-        model.position.y += (row.y - model.position.y) * mix;
-        model.position.z += (row.z - model.position.z) * mix;
-        const turn = row.yaw - model.rotation.y;
-        model.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * mix;
+        const previousX = root.position.x;
+        const previousZ = root.position.z;
         const downed = row.state === 'downed';
-        model.rotation.z += ((downed ? Math.PI / 2 : 0) - model.rotation.z) * mix;
-        model.position.y += (downed ? -.35 : 0);
+        root.position.x += (row.x - root.position.x) * mix;
+        root.position.y += ((row.y - (downed ? DOWNED_DROP : 0)) - root.position.y) * mix;
+        root.position.z += (row.z - root.position.z) * mix;
+        const turn = row.yaw - root.rotation.y;
+        root.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * mix;
+        entry.tilt.rotation.z += ((downed ? Math.PI / 2 : 0) - entry.tilt.rotation.z) * mix;
         entry.light.visible = downed;
-        if (downed) entry.light.position.y = 1.9;
+        if (entry.rig) {
+          // 用真实位移推算移动状态，驱动骨骼走路/奔跑动画。
+          const moved = Math.hypot(root.position.x - previousX, root.position.z - previousZ);
+          const speed = dt > 0 ? moved / dt : 0;
+          entry.speed += (speed - entry.speed) * Math.min(1, dt * 8);
+          entry.rig.update(dt, { moving: !downed && entry.speed > .12, sprint: entry.speed > 3.2 });
+        }
       }
       renderPanel();
       renderPrompt();

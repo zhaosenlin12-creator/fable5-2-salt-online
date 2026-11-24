@@ -20,6 +20,7 @@
     'shared-patrols.js',
     'expedition-portals.js',
     'lunar-suit.js',
+    'soldier-textures.js',
     'soldier-outfits.js',
     'road-sign-rules.js',
     'road-sign-physics.js',

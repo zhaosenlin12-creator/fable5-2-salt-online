@@ -189,7 +189,11 @@ import { clone as cloneSkinned } from '/vendor/SkeletonUtils.js';
       node.frustumCulled = false;
       const apply = (material) => {
         if (!material) return material;
-        if (!materialCache.has(material.uuid)) materialCache.set(material.uuid, tintMaterial(material, config.tint));
+        if (!materialCache.has(material.uuid)) {
+          const tinted = tintMaterial(material, config.tint);
+          // GLB 里没有任何贴图，这里补上程序化布料/皮肤纹理，避免角色是一块死板的纯色。
+          materialCache.set(material.uuid, window.SoldierTextures?.decorate(tinted) || tinted);
+        }
         return materialCache.get(material.uuid);
       };
       node.material = Array.isArray(node.material) ? node.material.map(apply) : apply(node.material);
